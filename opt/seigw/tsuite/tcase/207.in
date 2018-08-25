@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (207) : big size body ("fail, too long size body [%d]")
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         = GET
+URI            = https://udr.jdin.com:8081/restapi/subscriber?id=64468
+CONTENT_TYPE   = text/json
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = 

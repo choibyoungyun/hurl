@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (205) : invalid URI (invalid protocol)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         = GET
+URI            = ftp://udr.jdin.com:8081/restapi/env_fcgi
+CONTENT_TYPE   = CONTEST_TYPE
+CONTENT_LENGTH = 0
+ADD_HEADER     = ADD
+BODY           = BODY

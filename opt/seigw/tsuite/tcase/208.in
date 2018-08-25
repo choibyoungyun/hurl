@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (208) : HTTP ERROR BUT EXISTS BODY
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         = GET
+URI            = https://udr.jdin.com:8081/restapi/unknown
+CONTENT_TYPE   = CONTEST_TYPE
+CONTENT_LENGTH = 0
+ADD_HEADER     = ADD
+BODY           = BODY

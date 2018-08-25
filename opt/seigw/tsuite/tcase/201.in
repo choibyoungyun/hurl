@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (201) : invalid URI (NULL value)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         = GET
+URI            = 
+CONTENT_TYPE   = CONTEST_TYPE
+CONTENT_LENGTH = 0
+ADD_HEADER     = ADD
+BODY           = BODY

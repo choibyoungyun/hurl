@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (203) : invalid METHOD (NULL value)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         =
+URI            = https://udr.jdin.com:8081/restapi/env_fcgi
+CONTENT_TYPE   = CONTEST_TYPE
+CONTENT_LENGTH = 0
+ADD_HEADER     = ADD
+BODY           = BODY

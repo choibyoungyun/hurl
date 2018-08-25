@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (998) : JDIN REST API (VNF - HTTP/1.1)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = UDR
+METHOD         = GET
+URI            = http://192.168.0.210:3000/vnfconfig/v1/configuration
+CONTENT_TYPE   = text/json
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = 

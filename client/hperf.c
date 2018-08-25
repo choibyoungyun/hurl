@@ -1,17 +1,39 @@
-/* ****************************************************************************
- *       Filename:  test_simple.c
- *    Description:
+/* ***************************************************************************
+ *
+ *       Filename:  hperf.c
+ *    Description:  http performance
  *        Version:  1.0
- *        Created:  06/27/18 15:14:14
+ *        Created:  08/01/18 14:05:52
  *       Revision:  none
  *       Compiler:  gcc
+ *
  *         Author:  B.Y CHOI (LIVE), NONE
  *   Organization:
  *
- * **************************************************************************/
+ * ***************************************************************************/
 
-#include <hurl.h>
 
+#include <hcommon.h>
+#include <hcurl.h>
+
+static  int recv_count;
+
+
+curl_socket_t
+opensocket_callback (void *p_clientp,
+                     curlsocktype purpose,
+                     struct curl_sockaddr *p_addr)
+{
+    curl_socket_t   sockfd;
+    sockfd = *(curl_socket_t *)p_clientp;
+
+    UNUSED (purpose);
+    UNUSED (p_addr);
+
+    HTTP_LOG("-->connect %d\n", sockfd);
+
+    return (sockfd);
+}
 
 
 /* **************************************************************************
@@ -48,13 +70,22 @@ setopt_http_request (pst_http_request_t   p_req)
     curl_easy_setopt (p_handle, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt (p_handle, CURLOPT_SSL_VERIFYHOST, 0L);
 
+
+    /*
+    curl_easy_setopt (p_handle, CURLOPT_OPENSOCKETFUNCTION,
+                opensocket_callback);
+    curl_easy_setopt (p_handle, CURLOPT_OPENSOCKETDATA,
+                &fd);
+                */
+
+
     return (e_code);
 }
 
 
 
 /* **************************************************************************
- *	@brief      setopt_http_request
+ *	@brief      process_http_response
  *	@version
  *  @ingroup
  *  @date
@@ -65,18 +96,10 @@ setopt_http_request (pst_http_request_t   p_req)
 
 static
 e_http_error_code_t
-process_http_response (long rsp_code,
-                       char *p_header,
-                       char *p_body)
+process_http_response (pst_http_request_t p_http)
 {
-    UNUSED (rsp_code);
-    UNUSED (p_header);
-    UNUSED (p_body);
-    HTTP_LOG("==> %s\n", p_header);
-    /*
-    HTTP_LOG("==> %ld\n", rsp_code);
-    HTTP_LOG("==> %s\n", p_body);
-    */
+    recv_count++;
+    UNUSED (p_http);
 
     return (E_SUCCESS);
 }
@@ -93,7 +116,11 @@ main (int argc, char *argv[])
     int                 num = 1024;
 
 
-    if (init_http_handle (&p_handle, HTTP_SOCKET_MODE, NULL) != E_SUCCESS)
+    if (init_http_handle (&p_handle,
+                          NULL,
+                          NULL,
+                          HTTP_SIMPLE_MODE,
+                          NULL) != E_SUCCESS)
     {
         return (-1);
     }
@@ -108,7 +135,7 @@ main (int argc, char *argv[])
         p_request = NULL;
         e_code = init_http_request (p_handle,
                                     &p_request,
-                                    setopt_http_request,
+                                    NULL,
                                     process_http_response);
         if (e_code != E_SUCCESS)
         {
@@ -125,6 +152,7 @@ main (int argc, char *argv[])
             }
         }
 
+        setopt_http_request (p_request);
         (void) perform_http_handle (p_handle, p_request);
     }
 
@@ -134,6 +162,9 @@ main (int argc, char *argv[])
     }
 
     (void) destory_http_handle (p_handle);
+
+    fprintf (stdout, "info, recv response count : %d\n", recv_count);
+    fflush  (stdout);
 
     return (0);
 }

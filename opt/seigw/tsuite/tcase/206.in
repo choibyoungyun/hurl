@@ -1,0 +1,12 @@
+#-------------------------------------------------------------
+# DESC (206) : invalid URI (invalid protocol - too short case)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = NF
+METHOD         = GET
+URI            = htt
+CONTENT_TYPE   = CONTEST_TYPE
+CONTENT_LENGTH = 0
+ADD_HEADER     = ADD
+BODY           = BODY

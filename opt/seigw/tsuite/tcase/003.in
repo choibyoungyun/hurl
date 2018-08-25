@@ -1,0 +1,13 @@
+#-------------------------------------------------------------
+# DESC (003) : NORMAL (H2, ADD BODY)
+#           ex) Accept-Encoding : gzip, deflate,...,*/*; tar
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+NF             = UDR
+METHOD         = PUT
+URI            = https://udr.jdin.com:8081/restapi/notify_fcgi
+CONTENT_TYPE   = text/plain
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = so what?

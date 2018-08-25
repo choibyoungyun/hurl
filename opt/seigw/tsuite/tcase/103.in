@@ -1,0 +1,14 @@
+#-------------------------------------------------------------
+# DESC (103) : invalid header length (too long)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+HEADER_LENGTH  = 65535
+
+NF             = UDR
+METHOD         = GET
+URI            = https://udr.jdin.com:8081/restapi/env_fcgi
+CONTENT_TYPE   = text/jon
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = 

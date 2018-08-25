@@ -1,0 +1,14 @@
+#-------------------------------------------------------------
+# DESC (101) : invalid header (frame)
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+HEADER_FRAME   = 10
+HEADER_GWRTVAL = 100
+NF             = UDR
+METHOD         = GET
+URI            = https://udr.jdin.com:8081/restapi/env_fcgi
+CONTENT_TYPE   = text/jon
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = 

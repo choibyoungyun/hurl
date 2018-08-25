@@ -1,0 +1,13 @@
+#-------------------------------------------------------------
+# DESC (997) : https://www.daum.net (HTTP) [BIG SIZE BODY]
+#-------------------------------------------------------------
+
+[TEST_CASE_INPUT]
+
+NF             = UDR
+METHOD         = GET
+URI            = https://www.daum.net
+CONTENT_TYPE   = text/jon
+CONTENT_LENGTH = 0
+ADD_HEADER     = 
+BODY           = 
