@@ -15,10 +15,10 @@
 
 #include <hworker.h>
 
-
 extern e_error_code_t  do_job   (pst_process_handle_t   p_handle);
 extern e_error_code_t  register_eigw_handle (pst_eigw_handle_t     p_handle);
 extern e_error_code_t  startup_eigw_rthread (pst_eigw_handle_t     p_handle);
+extern e_error_code_t  set_client_id_eigw_handle (pst_eigw_client_id_t);
 
 
 /* **************************************************************************
@@ -197,6 +197,14 @@ init_process (pst_process_handle_t p_handle)
                                            p_handle->p_trace->csection);
     }
 
+    /* --------------------------------------------------------------------
+     * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
+     *             exception_init_process);
+     *
+     * initialize   OAM interface
+     * try_exception ((e_code = init_oam (p_handle, mod_name)) != E_SUCCESS,
+     *             exception_init_process);
+     * -------------------------------------------------------------------- */
 
     try_exception ((e_code = init_signal (&p_handle->p_sig,
                                           (pf_reload_t) set_reload_process,
@@ -223,6 +231,7 @@ init_process (pst_process_handle_t p_handle)
                                                (char *)"EIGW"))
                    != E_SUCCESS,
                    exception_init_process);
+    (void) set_client_id_eigw_handle (&p_handle->p_eigw->client_id);
     (void) register_eigw_handle (p_handle->p_eigw);
     if (p_handle->p_eigw->pf_show)
     {
@@ -244,16 +253,6 @@ init_process (pst_process_handle_t p_handle)
         (void)(p_handle->p_fcgi->pf_show)(p_handle->p_fcgi,
                                           p_handle->p_fcgi->csection);
     }
-
-    /* --------------------------------------------------------------------
-     * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
-     *             exception_init_process);
-     *
-     * initialize   OAM interface
-     * try_exception ((e_code = init_oam (p_handle, mod_name)) != E_SUCCESS,
-     *             exception_init_process);
-     * -------------------------------------------------------------------- */
-
 
     /* -------------------------------------------------------------------
     try_exception ((e_code = init_job (p_handle)) != E_SUCCESS,

@@ -101,6 +101,7 @@ process_fcgi_notify (void *p_arg)
     try_finally;
 
 
+    destroy_socket_handle (&fcgi.p_sock);
     destroy_stream_handle (&fcgi.p_rbuf);
     free (p_job);
 
