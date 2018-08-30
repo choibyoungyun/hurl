@@ -18,7 +18,8 @@ CC			= g++
 PROGRAM1= hclient
 SRCS1   = init.c \
 		  job.c \
-		  main.c
+		  main.c \
+		  eigw.c
 OBJS1   =$(SRCS1:.c=.o)
 
 
