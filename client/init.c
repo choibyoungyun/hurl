@@ -16,6 +16,7 @@
 #include <hworker.h>
 
 extern e_error_code_t  do_job   (pst_process_handle_t   p_handle);
+extern e_error_code_t  set_client_id_eigw_handle (pst_eigw_client_id_t);
 
 
 /* **************************************************************************
@@ -153,7 +154,6 @@ inactive_process (pst_process_handle_t p_handle)
 
 
 
-
 /* **************************************************************************
  *	@brief			initialize process
  *  @version
@@ -203,6 +203,15 @@ init_process (pst_process_handle_t p_handle)
                     != E_SUCCESS,
                    exception_init_process);
 
+    /* --------------------------------------------------------------------
+     * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
+     *             exception_init_process);
+     *
+     * initialize   OAM interface
+     * try_exception ((e_code = init_oam (p_handle, mod_name)) != E_SUCCESS,
+     *             exception_init_process);
+     * -------------------------------------------------------------------- */
+
     try_exception ((e_code = init_worker (&p_handle->p_worker,
                                           p_handle->cfname,
                                  (char *) WORKER_CONFIG_SECTION_NAME))
@@ -219,6 +228,7 @@ init_process (pst_process_handle_t p_handle)
                                        (char *)EIGW_CONFIG_SECTION_NAME))
                    != E_SUCCESS,
                    exception_init_process);
+    set_client_id_eigw_handle (&p_handle->p_eigw->client_id);
     if (p_handle->p_eigw->pf_show)
     {
         (void)(p_handle->p_eigw->pf_show)(p_handle->p_eigw,
