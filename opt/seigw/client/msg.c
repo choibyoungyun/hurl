@@ -29,7 +29,9 @@ encode_http_request_msg_header (char                      *p_fname,
 {
     e_error_code_t  e_code = E_SUCCESS;
     unsigned short  frame  = 0xFEFE;
+    char            gateway_value[4] = {0x01, 0x02, 0x03, 0x04};
     char            value [256];
+
 
     /*  http method field           */
     memcpy (p_header->cFrame, &frame, 2);
@@ -69,12 +71,21 @@ encode_http_request_msg_header (char                      *p_fname,
     }
 
 
-    p_header->unGwRteVal = 0;
+    memcpy (&p_header->unGwRteVal,
+            gateway_value, sizeof (p_header->unGwRteVal));
     memset (value, 0x00, sizeof (value));
     READ_CONFIG_MSG (p_fname, CFG_EIGW_HEADER_GWRTVAL, value);
     if (value[0] != 0x00)
     {
-        p_header->unGwRteVal = (unsigned int) atoi (value);
+        char *p_ptr;
+        int  i;
+
+        p_ptr = (char *)&p_header->unGwRteVal;
+
+        for (i=0; i < 4; i++)
+        {
+            *(p_ptr + i) = (unsigned char) (value[i] - 0x30);
+        }
     }
 
 
