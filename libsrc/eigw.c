@@ -37,9 +37,12 @@ show_eigw_handle (pst_eigw_handle_t  p_handle,
         p_name = p_module;
 
     Log (DEBUG_CRITICAL,
-            "succ, loading %-8s property [client identifier    : %d]\n",
+            "succ, loading %-8s property [client identifier    : %02X%02X%02X%02X]\n",
             p_name,
-            p_handle->client_id);
+            p_handle->client_id.system_id,
+            p_handle->client_id.node_type,
+            p_handle->client_id.node_id,
+            p_handle->client_id.module_id);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [heartbeat interval   : %d]\n",
             p_name,
@@ -400,8 +403,11 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
 
     /*  validate client identifier          */
     e_code = E_PROTOCOL_INVALID_HEADER_CLIENTID;
-    try_exception (p_req->header.unGwRteVal != p_handle->client_id,
-                    exception_invalid_message_header);
+    try_exception (memcmp (&p_req->header.unGwRteVal,
+                           &p_handle->client_id,
+                           sizeof (p_req->header.unGwRteVal))
+                   != 0,
+                   exception_invalid_message_header);
 
     /*  validate message type               */
     e_code = E_PROTOCOL_INVALID_HEADER_TYPE;
@@ -438,6 +444,7 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
     try_catch (exception_invalid_message_header)
     {
         st_eigw_response_t  rsp;
+        st_eigw_client_id_t client_id;
         double              content_length = 0;
         char                err_string[256]={0,};
 
@@ -457,9 +464,14 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
                             ntohs (p_req->header.usLength));
                 break;
             case E_PROTOCOL_INVALID_HEADER_CLIENTID:
+                memcpy (&client_id,
+                        &p_req->header.unGwRteVal, sizeof (client_id));
                 sprintf (err_string,
-                            "fail, invalid message client id (id:%d)",
-                            p_req->header.unGwRteVal);
+                            "fail, invalid message client id (id:%02X%02X%02X%02X)",
+                            client_id.system_id,
+                            client_id.node_type,
+                            client_id.node_id,
+                            client_id.module_id);
                 break;
             case E_PROTOCOL_INVALID_HEADER_NAME:
                 sprintf (err_string,
@@ -869,7 +881,7 @@ bind_eigw_handle (pst_eigw_handle_t p_handle)
     {
         snprintf (p_handle->err_string,
                   sizeof (p_handle->err_string) - 1,
-                  "fail, bind       EIGW  [result:%d]\n",
+                  "fail, bind       EIGW  [result:%d]",
                   (int) rsp.header.sRet);
         e_code = E_FAILURE;
     }
@@ -877,7 +889,7 @@ bind_eigw_handle (pst_eigw_handle_t p_handle)
     {
         snprintf (p_handle->err_string,
                   sizeof (p_handle->err_string) - 1,
-                  "fail, bind       EIGW  [timeout(5)]\n");
+                  "fail, bind       EIGW  [timeout(5)]");
         e_code = E_FAILURE;
     }
     try_finally;
@@ -936,7 +948,7 @@ connect_eigw_handle (pst_eigw_handle_t p_handle)
         if (i%100 == 0)
         {
             Log (DEBUG_LOW,
-                    "fail, connect EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                    "fail, connect    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
                     p_handle->p_sock->remote_ip,
                     p_handle->p_sock->remote_port,
                     p_handle->p_sock->err_no,
@@ -949,7 +961,7 @@ connect_eigw_handle (pst_eigw_handle_t p_handle)
         Log (DEBUG_ERROR,
                 "%s\n", p_handle->err_string);
         Log (DEBUG_ERROR,
-                "fail, bind    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                "fail, bind       EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
                 p_handle->p_sock->remote_ip,
                 p_handle->p_sock->remote_port,
                 p_handle->p_sock->err_no,
@@ -1012,12 +1024,13 @@ set_eigw_handle (pst_eigw_handle_t p_handle)
     try_exception (Is_FileExist (p_handle->cfname) != TRUE,
                    exception_not_found_file);
 
+    /* NOT USED  */
     memset (buf, 0x00, sizeof (buf));
     (void) ReadConfFile (p_handle->cfname,
                         EIGW_CONFIG_SECTION_NAME,
-                        EIGW_CONFIG_CLIENT_ID_NAME,
-                        EIGW_CONFIG_CLIENT_ID_DEFAULT, buf);
-    p_handle->client_id = atoi (buf);
+                        EIGW_CONFIG_MODULE_ID_NAME,
+                        EIGW_CONFIG_MODULE_ID_DEFAULT, buf);
+    p_handle->client_id.module_id = (char)atoi (buf);
 
 
     memset (buf, 0x00, sizeof (buf));
