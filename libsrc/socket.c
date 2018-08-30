@@ -24,6 +24,61 @@
 #endif
 
 
+/* **************************************************************************
+ *  @brief          set_addrinfo_handle
+ *  @version
+ *  @ingroup
+ *  @date
+ *  @author
+ *  @param [OUT]    p_addr  - socket address
+ *  @param [IN ]    p_ip    - ip address
+ *  @param [IN ]    p_port  - service port
+ *  @retval         integer
+ * **************************************************************************/
+static
+e_error_code_t
+set_addrinfo_handle (pst_socket_addr_t   p_addr,
+                     char                *p_ip,
+                     char                *p_port,
+                     int                 *p_errno)
+{
+    e_error_code_t  e_code = E_SUCCESS;
+    struct addrinfo hints;
+    struct addrinfo *p_res = NULL;
+    char            *p_node = p_ip;
+
+
+    memset (&hints, 0x00, sizeof (hints));
+    hints.ai_family = AF_UNSPEC;
+    /* hints.ai_flags  = AI_NUMERICSERV | AI_NUMERICHOST; */
+    if ((p_ip == NULL)
+            || ((p_ip != NULL) && (*p_ip == 0x00))
+            || (strcmp(p_ip,"0.0.0.0") == 0))
+    {
+        /* -------------------------------------------
+         * address sequence refers to /etc/gai.conf
+         * -------------------------------------------- */
+        hints.ai_flags  = hints.ai_flags | AI_PASSIVE;
+        p_node = NULL;
+    }
+
+    if (((*p_errno) = getaddrinfo (p_node, p_port, &hints, &p_res)) != 0)
+    {
+        if (p_res)
+            freeaddrinfo (p_res);
+        return (E_FAILURE);
+    }
+
+    p_addr->domain      = p_res->ai_family;
+    p_addr->addr_len    = p_res->ai_addrlen;
+    memcpy (&p_addr->addr, p_res->ai_addr, p_res->ai_addrlen);
+
+    freeaddrinfo (p_res);
+
+    return (e_code);
+}
+
+
 
 
 /* **************************************************************************
@@ -281,11 +336,6 @@ set_ipaddr_handle (pst_socket_handle_t p_handle,
                         NULL, buf);
     strcpy (p_handle->local_port, buf);
 
-    p_handle->local.addr.a4.sin_family      = AF_INET;
-    p_handle->local.addr.a4.sin_addr.s_addr = inet_addr (p_handle->local_ip);
-    p_handle->local.addr.a4.sin_port        = atoi (p_handle->local_port);
-
-
     memset (buf, 0x00, sizeof (buf));
     (void) ReadConfFile (p_handle->cfname,
                         p_section,
@@ -306,11 +356,6 @@ set_ipaddr_handle (pst_socket_handle_t p_handle,
                         SOCKET_CONFIG_REMOTE_PORT_NAME,
                         NULL, buf);
     strcpy (p_handle->remote_port, buf);
-
-    p_handle->remote.addr.a4.sin_family      = AF_INET;
-    p_handle->remote.addr.a4.sin_addr.s_addr = inet_addr (p_handle->remote_ip);
-    p_handle->remote.addr.a4.sin_port        = atoi (p_handle->remote_port);
-
 
     try_catch (exception_not_found_file)
     {
@@ -638,23 +683,20 @@ static
 e_error_code_t
 connect_handle (pst_socket_handle_t    p_handle)
 {
-    e_error_code_t  e_code = E_SUCCESS;
-    socklen_t       address_len;
+    e_error_code_t  e_code   = E_SUCCESS;
     int             opt      = 1;
+    int             ret      = 0;
 
 
-    address_len  = sizeof (struct sockaddr_in);
-    p_handle->remote.domain                  = AF_INET;
-    p_handle->remote.addr.a4.sin_family      = AF_INET;
-    inet_pton (p_handle->remote.addr.a4.sin_family,
-               p_handle->remote_ip, &(p_handle->remote.addr.a4.sin_addr));
-    p_handle->remote.addr.a4.sin_port = htons(atoi(p_handle->remote_port));
+    try_exception (set_addrinfo_handle (&p_handle->remote,
+                                        p_handle->remote_ip,
+                                        p_handle->remote_port,
+                                        &ret) != E_SUCCESS,
+                   exception_addrinfo_socket);
 
     try_exception ((p_handle->sfd = socket (p_handle->remote.domain,
                                             SOCK_STREAM, 0)) < 0,
                    exception_create_socket);
-
-
     if (p_handle->nodelay == BOOL_TRUE)
     {
         try_exception (setsockopt (p_handle->sfd,
@@ -667,16 +709,21 @@ connect_handle (pst_socket_handle_t    p_handle)
 
     try_exception (connect (p_handle->sfd,
                             (const struct sockaddr *)&(p_handle->remote.addr),
-                            address_len)
+                            p_handle->remote.addr_len)
                     != 0,
                    exception_connect_socket);
 
 
+    try_catch (exception_addrinfo_socket)
+    {
+        p_handle->err_no = ret;
+        strcpy (p_handle->err_string, gai_strerror(p_handle->err_no));
+        e_code = E_FAILURE;
+    }
     try_catch (exception_create_socket)
     {
         p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(errno));
-
+        strcpy (p_handle->err_string, strerror(p_handle->err_no));
         e_code = E_FAILURE;
     }
     try_catch (exception_option_socket)
@@ -720,21 +767,13 @@ listen_handle (pst_socket_handle_t   p_handle)
 {
     e_error_code_t  e_code = E_SUCCESS;
     int             option = 1;
-    socklen_t       address_len;
+    int             ret    = 0;
 
-
-    p_handle->local.domain = AF_INET6;
-    address_len            = sizeof (struct sockaddr_in6);
-    if (strchr (p_handle->local_ip, ':') == NULL)
-    {
-        p_handle->local.domain = AF_INET;
-        address_len            = sizeof (struct sockaddr_in);
-    }
-
-    p_handle->local.addr.a4.sin_family      = AF_INET;
-    inet_pton (p_handle->local.addr.a4.sin_family,
-               p_handle->local_ip, &p_handle->local.addr.a4.sin_addr);
-    p_handle->local.addr.a4.sin_port = htons (atoi(p_handle->local_port));
+    try_exception (set_addrinfo_handle (&p_handle->local,
+                                        p_handle->local_ip,
+                                        p_handle->local_port,
+                                        &ret) != E_SUCCESS,
+                   exception_addrinfo_socket);
 
     try_exception ((p_handle->sfd = socket (p_handle->local.domain,
                                             SOCK_STREAM, 0)) < 0,
@@ -748,14 +787,23 @@ listen_handle (pst_socket_handle_t   p_handle)
 
     try_exception (bind (p_handle->sfd,
                           (struct sockaddr *)&p_handle->local.addr,
-                          (socklen_t) address_len) < 0,
+                          (socklen_t) p_handle->local.addr_len) < 0,
                     exception_listen_socket);
 
     try_exception (listen (p_handle->sfd, p_handle->backlog) < 0,
                     exception_listen_socket);
 
-    try_catch (exception_create_socket)
+
+    try_catch (exception_addrinfo_socket)
     {
+        p_handle->err_no = ret;
+        strcpy (p_handle->err_string, gai_strerror(p_handle->err_no));
+        e_code = E_FAILURE;
+    }
+    try_catch_through (exception_create_socket)
+    {
+        p_handle->err_no = errno;
+        strcpy (p_handle->err_string, strerror(errno));
         e_code = E_FAILURE;
     }
     try_catch (exception_listen_socket)
@@ -795,7 +843,6 @@ accept_handle (pst_socket_handle_t    p_local,
     fd_set          active_fd_set, read_fd_set;
     struct  timeval timeout;
     int             ret;
-    int             addr_len;
     int             sfd = -1;
 
 
@@ -817,18 +864,9 @@ accept_handle (pst_socket_handle_t    p_local,
 
     if (FD_ISSET (p_local->sfd, &read_fd_set))
     {
-        if (p_local->local.domain == AF_INET)
-        {
-            addr_len = sizeof (struct sockaddr_in);
-        }
-        else
-        {
-            addr_len = sizeof (struct sockaddr_in6);
-        }
-
         sfd = accept (p_local->sfd,
                         (struct sockaddr *)&p_local->remote.addr,
-                        (socklen_t *) &addr_len);
+                        (socklen_t *) &p_local->remote.addr_len);
         try_exception (sfd < 0, exception_accept_call);
     }
 
@@ -838,7 +876,7 @@ accept_handle (pst_socket_handle_t    p_local,
     memcpy (p_remote, p_local, sizeof (*p_remote));
     p_remote->sfd  = sfd;
     p_remote->role = SOCKET_SERVER_ROLE;
-    if (addr_len == sizeof (struct sockaddr_in))
+    if (p_local->remote.addr_len == sizeof (struct sockaddr_in))
     {
         p_remote->remote.domain = AF_INET;
         inet_ntop (p_remote->remote.domain,
