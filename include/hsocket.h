@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -94,6 +95,7 @@ typedef struct _st_socket_addr_t    *pst_socket_addr_t;
 typedef struct _st_socket_addr_t
 {
     int     domain;
+    int     addr_len;
 
     union {
         struct  sockaddr_in  a4;
