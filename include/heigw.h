@@ -42,16 +42,28 @@
  * DEFINE CONFIG OPTION
  * ----------------------------------------------------------------------- */
 #define EIGW_CONFIG_SECTION_NAME                "EIGW"
-#define EIGW_CONFIG_CLIENT_ID_NAME              "CLIENT_ID"
+#define EIGW_CONFIG_MODULE_ID_NAME              "MODULE_ID"
 #define EIGW_CONFIG_HB_INTERVAL_NAME            "HB_INTERVAL"
 #define EIGW_CONFIG_STREAM_BUF_SIZE_NAME        "STREAM_BUF_SIZE"
 #define EIGW_CONFIG_PENDING_BUF_COUNT_NAME      "PENDING_BUF_COUNT"
 
-#define EIGW_CONFIG_CLIENT_ID_DEFAULT           "0"
+#define EIGW_CONFIG_MODULE_ID_DEFAULT           "0"
 #define EIGW_CONFIG_HB_INTERVAL_DEFAULT         "3"
 #define EIGW_CONFIG_STREAM_BUF_SIZE_DEFAULT     "65536"
 #define EIGW_CONFIG_PENDING_BUF_COUNT_DEFAULT   "64"
 
+
+/*  ----------------------------------------------------------------------
+ *  EIGW (unGwRteVal)
+ *  ---------------------------------------------------------------------- */
+typedef struct _st_eigw_client_id_t *pst_eigw_client_id_t;
+typedef struct _st_eigw_client_id_t
+{
+    char    system_id;
+    char    node_type;
+    char    node_id;
+    char    module_id;
+} st_eigw_client_id_t;
 
 /*  ----------------------------------------------------------------------
 typedef struct stMsgHeader{
@@ -65,7 +77,6 @@ typedef struct stMsgHeader{
 	u_char		ucReserved;	Reserved
 }_MSG_HEADER;
  -------------------------------------------------------------------------- */
-
 
 typedef _MSG_HEADER                 st_eigw_request_header_t;
 typedef st_eigw_request_header_t   *pst_eigw_request_header_t;
@@ -197,7 +208,7 @@ typedef struct _st_eigw_handle_t
     unsigned long               send_seq;
 
     /*  client identifier for EIGW COMM */
-	unsigned int		        client_id;
+	st_eigw_client_id_t         client_id;
     unsigned int                hb_interval;
     unsigned int                last_tick;
 
