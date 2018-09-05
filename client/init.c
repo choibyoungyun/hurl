@@ -249,6 +249,17 @@ init_process (pst_process_handle_t p_handle)
     }
 
 
+    try_exception ((e_code = init_auth_handle (&p_handle->p_auth,
+                                               p_handle->cfname,
+                                      (char *) OAUTH_CONFIG_SECTION_NAME))
+                   != E_SUCCESS,
+                   exception_init_process);
+    if (p_handle->p_http->pf_show)
+    {
+        (void)(p_handle->p_auth->pf_show)(p_handle->p_auth, NULL);
+    }
+    p_handle->p_http->p_auth = (void *) p_handle->p_auth;
+
     /* --------------------------------------------------------------------
      * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
      *             exception_init_process);

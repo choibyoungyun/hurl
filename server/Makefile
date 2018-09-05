@@ -3,7 +3,6 @@
 # ###########################################################################
 #  DEFINE Package Base Directory
 # ###########################################################################
-WORKHOME	= $(HOME)/workspace/KT114
 REST_HOME   = $(HOME)/workspace/hurl
 INSTALL_DEST= $(HOME)/bin
 

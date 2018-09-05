@@ -10,8 +10,22 @@
  *         Author:  B.Y CHOI (LIVE), NONE
  *   Organization:
  *
+ *      show_eigw_handle                ()
+ *      alloc_pending_queue_eigw_handle ()
+ *      free_pending_queue_eigw_handle  ()
+ *      encode_eigw_handle              ()
+ *      set_errstring_eigw_handle       ()
+ *      validate_body_eigw_handle       ()
+ *      validate_header_eigw_handle     ()
+ *      recv_eigw_handle                ()
+ *      send_eigw_handle                ()
+ *      heartbeat_eigw_handle           ()
+ *      bind_eigw_handle                ()
+ *      connect_eigw_handle             ()
+ *      disconnect_eigw_handle          ()
+ *      init_eigw_handle                ()
+ *      destroy_socket_handle           ()
  * ***************************************************************************/
-
 
 #include <heigw.h>
 
@@ -255,15 +269,100 @@ encode_eigw_handle (pst_eigw_request_t      p_req,
 
 
 
-
 /* **************************************************************************
- *	@brief      validate_application_request
+ *	@brief          set error string
  *	@version
  *  @ingroup
  *  @date
  *  @author
  *  @param
- *  @retval     int
+ *  @param    [OUT] p_handle   - handle
+ *  @param    [IN ] p_req      - request message
+ *  @param    [IN ] p_err_code - error code
+ *  @retval         E_SUCCESS/else
+ * **************************************************************************/
+static
+e_error_code_t
+set_errstring_eigw_handle (pst_eigw_handle_t   p_handle,
+                           pst_eigw_request_t  p_req,
+                           e_error_code_t      err_code)
+{
+    st_eigw_client_id_t client_id;
+
+    switch (err_code)
+    {
+        case E_PROTOCOL_INVALID_BODY_URI:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message URI      (URI:NULL)");
+            break;
+        case E_PROTOCOL_INVALID_BODY_PROTOCOL:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message PROTOCOL (URI:%s)",
+                        p_req->body.data + p_req->body.ind2);
+            break;
+        case E_PROTOCOL_INVALID_BODY_METHOD:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message METHOD   (METHOD:%s)",
+                        p_req->body.method[0] == 0x00
+                         ? "NULL" : p_req->body.method);
+            break;
+        case E_PROTOCOL_INVALID_HEADER_FRAME:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message frame     (frame:0x%02X%02X)",
+                        p_req->header.cFrame[0],
+                        p_req->header.cFrame[1]);
+            break;
+        case E_PROTOCOL_INVALID_HEADER_LENGTH:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message length    (len:%d)",
+                        ntohs (p_req->header.usLength));
+            break;
+        case E_PROTOCOL_INVALID_HEADER_CLIENTID:
+            memcpy (&client_id,
+                    &p_req->header.unGwRteVal, sizeof (client_id));
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message client id (id:%02X%02X%02X%02X)",
+                        client_id.system_id,
+                        client_id.node_type,
+                        client_id.node_id,
+                        client_id.module_id);
+            break;
+        case E_PROTOCOL_INVALID_HEADER_NAME:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message name      (name:%d)",
+                        p_req->header.unMsgName);
+            break;
+        case E_PROTOCOL_INVALID_HEADER_TYPE:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, invalid message type      (name:%d, type:%d)",
+                        p_req->header.unMsgName,
+                        GET_MSGN_TYPE(p_req->header.unMsgName));
+            break;
+        default:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                        "fail, undefined  body error    (%d:%ld)",
+                        p_req->header.unGwRteVal,
+                        p_req->header.ulSeq);
+
+            break;
+    }
+
+    return (E_SUCCESS);
+}
+
+
+
+
+/* **************************************************************************
+ *	@brief          validate message body
+ *	@version
+ *  @ingroup
+ *  @date
+ *  @author
+ *  @param
+ *  @param    [OUT] pp_handle  - handle
+ *  @param    [IN ] p_fnmae    - config file full path
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 
 static
@@ -276,7 +375,7 @@ validate_body_eigw_handle (pst_eigw_handle_t    p_handle,
 
     /*  validate message frame          */
     e_code = E_PROTOCOL_INVALID_BODY_URI;
-    try_exception ((p_req->body.ind2 == 0)
+    try_exception ((p_req->body.ind2 <= 0)
                     || (p_req->body.data[p_req->body.ind2] == 0x00),
                     exception_invalid_message_body);
 
@@ -317,57 +416,16 @@ validate_body_eigw_handle (pst_eigw_handle_t    p_handle,
     try_catch (exception_invalid_message_body)
     {
         st_eigw_response_t  rsp;
-        double              content_length = 0;
-        char                err_string[256]={0,};
-
-        /* memset (&rsp,      0x00, sizeof (rsp)); */
-        p_req->body.data[0] = 0x00;
-
-        switch (e_code)
-        {
-            case E_PROTOCOL_INVALID_BODY_URI:
-                sprintf (err_string,
-                            "fail, invalid message URI      (URI:NULL)");
-                break;
-            case E_PROTOCOL_INVALID_BODY_PROTOCOL:
-                sprintf (err_string,
-                            "fail, invalid message PROTOCOL (URI:%s)",
-                            p_req->body.data + p_req->body.ind2);
-                break;
-            case E_PROTOCOL_INVALID_BODY_METHOD:
-                sprintf (err_string,
-                            "fail, invalid message METHOD   (METHOD:%s)",
-                            p_req->body.method[0] == 0x00
-                             ? "NULL" : p_req->body.method);
-                break;
-            default:
-                e_code = E_PROTOCOL_INVALID_BODY;
-                sprintf (err_string,
-                            "fail, undefined  body error    (%d:%ld)",
-                            p_req->header.unGwRteVal,
-                            p_req->header.ulSeq);
-
-                break;
-        }
-        content_length = (double) strlen (err_string);
+        (void) set_errstring_eigw_handle (p_handle, p_req, e_code);
         (void) (*p_handle->pf_encode)(p_req,
                                       &rsp,
                                       e_code,
                                       (char *) "text/plain",
-                                      content_length,
+                                      strlen (p_handle->err_string),
                                       NULL,
                                       NULL,
-                                      err_string);
-
-        rsp.header.usLength = htons (rsp.header.usLength);
-        p_handle->p_sock->p_sndbuf = (char *)&rsp;
-        (void) (*p_handle->p_sock->pf_send)(p_handle->p_sock,
-                                            ntohs (rsp.header.usLength));
-
-        Log (DEBUG_ERROR, "fail, req SRC[%ld:%d] [err: %s]\n",
-                        p_req->header.unGwRteVal,
-                        p_req->header.ulSeq,
-                        err_string);
+                                      p_handle->err_string);
+        (*p_handle->pf_send) (p_handle, NULL, &rsp);
     }
     try_finally;
 
@@ -398,7 +456,7 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
     /*  validate message frame          */
     e_code = E_PROTOCOL_INVALID_HEADER_FRAME;
     memcpy ((void *)&frame, (void *)p_req->header.cFrame, 2);
-    try_exception (frame != 0xFEFE,
+    try_exception (frame != EIGW_HEADER_FRAME_VALUE,
                    exception_invalid_message_header);
 
     /*  validate client identifier          */
@@ -444,71 +502,17 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
     try_catch (exception_invalid_message_header)
     {
         st_eigw_response_t  rsp;
-        st_eigw_client_id_t client_id;
-        double              content_length = 0;
-        char                err_string[256]={0,};
 
-        /*   memset (&rsp,      0x00, sizeof (rsp)); */
-        p_req->body.data[0] = 0x00;
-
-        switch (e_code)
-        {
-            case E_PROTOCOL_INVALID_HEADER_FRAME:
-                sprintf (err_string,
-                            "fail, invalid message frame     (frame:0x%x)",
-                            frame);
-                break;
-            case E_PROTOCOL_INVALID_HEADER_LENGTH:
-                sprintf (err_string,
-                            "fail, invalid message length    (len:%d)",
-                            ntohs (p_req->header.usLength));
-                break;
-            case E_PROTOCOL_INVALID_HEADER_CLIENTID:
-                memcpy (&client_id,
-                        &p_req->header.unGwRteVal, sizeof (client_id));
-                sprintf (err_string,
-                            "fail, invalid message client id (id:%02X%02X%02X%02X)",
-                            client_id.system_id,
-                            client_id.node_type,
-                            client_id.node_id,
-                            client_id.module_id);
-                break;
-            case E_PROTOCOL_INVALID_HEADER_NAME:
-                sprintf (err_string,
-                            "fail, invalid message name      (name:%d)",
-                            p_req->header.unMsgName);
-                break;
-            case E_PROTOCOL_INVALID_HEADER_TYPE:
-                sprintf (err_string,
-                            "fail, invalid message type      (name:%d, type:%d)",
-                            p_req->header.unMsgName,
-                            GET_MSGN_TYPE(p_req->header.unMsgName));
-                break;
-            default:
-                e_code = E_PROTOCOL_INVALID_BODY;
-                sprintf (err_string,
-                            "fail, undefined  error (%ld)",
-                            p_req->header.ulSeq);
-
-                break;
-        }
-
-        content_length = (double) strlen (err_string);
+        (void) set_errstring_eigw_handle (p_handle, p_req, e_code);
         (void) (*p_handle->pf_encode)(p_req,
                                       &rsp,
                                       e_code,
                                       (char *) "text/plain",
-                                      content_length,
+                                      strlen (p_handle->err_string),
                                       NULL,
                                       NULL,
-                                      err_string);
-
-        rsp.header.usLength = htons (rsp.header.usLength);
-        p_handle->p_sock->p_sndbuf = (char *)&rsp;
-        (void) (*p_handle->p_sock->pf_send)(p_handle->p_sock,
-                                            ntohs (rsp.header.usLength));
-
-        Log (DEBUG_ERROR, "%s\n", err_string);
+                                      p_handle->err_string);
+        (*p_handle->pf_send) (p_handle, NULL, &rsp);
     }
     try_finally;
 
@@ -610,8 +614,8 @@ recv_eigw_handle (pst_eigw_handle_t p_handle)
                    exception_invalid_header_eigw);
 
     if ((p_handle->p_req == NULL)
-            && (GET_MSGN_TYPE(p_req->header.unMsgName) == MSG_TYPE_REQ)
-            && (GET_MSGN_NAME(p_req->header.unMsgName) == EIGW_MSG_NAME_REST_REQ))
+        && (GET_MSGN_TYPE(p_req->header.unMsgName) == MSG_TYPE_REQ)
+        && (GET_MSGN_NAME(p_req->header.unMsgName) == EIGW_MSG_NAME_REST_REQ))
     {
         try_exception ((e_code = alloc_pending_queue_eigw_handle (p_handle,
                                                          &p_handle->p_req))
@@ -632,13 +636,6 @@ recv_eigw_handle (pst_eigw_handle_t p_handle)
             p_handle->p_req->header.unMsgName);
 
 
-    if (time (NULL) - p_handle->last_tick > p_handle->hb_interval)
-    {
-        try_exception ((*p_handle->pf_heartbeat)(p_handle) != E_SUCCESS,
-                        exception_invalid_heartbeat_eigw);
-    }
-
-
     try_catch (exception_connect_eigw)
     {
         e_code = E_SOCK_DISCONNECT;
@@ -655,10 +652,6 @@ recv_eigw_handle (pst_eigw_handle_t p_handle)
     try_catch (exception_invalid_body_eigw)
     {
         e_code = E_PROTOCOL_INVALID_BODY;
-    }
-    try_catch (exception_invalid_heartbeat_eigw)
-    {
-        e_code = E_SUCCESS;
     }
     try_catch (exception_recv_from_eigw)
     {
@@ -708,10 +701,13 @@ send_eigw_handle (pst_eigw_handle_t     p_handle,
 
     if (p_handle->p_sock->sfd == -1)
     {
-        Log (DEBUG_ERROR,
-                "fail, discard http response(not connect app) [%s:%s]\n",
-                p_rsp->body.status_code,
-                p_req->body.data + p_req->body.ind2);
+        if (p_req != NULL)
+        {
+            Log (DEBUG_ERROR,
+                    "fail, discard http response(not connect app) [%s:%s]\n",
+                    p_rsp->body.status_code,
+                    p_req->body.data + p_req->body.ind2);
+        }
 
     }
     else
@@ -725,7 +721,7 @@ send_eigw_handle (pst_eigw_handle_t     p_handle,
         p_handle->last_tick = time (NULL);
         Log (DEBUG_LOW,
                 "succ, send message to   eigw [SRC:%x SEQ:%d len:%d name:%x]\n",
-                p_req->header.unGwRteVal,
+                p_rsp->header.unGwRteVal,
                 p_rsp->header.ulSeq,
                 ntohs (p_rsp->header.usLength),
                 p_rsp->header.unMsgName);
@@ -741,14 +737,21 @@ send_eigw_handle (pst_eigw_handle_t     p_handle,
                 p_handle->p_sock->err_no,
                 p_handle->p_sock->err_string);
 
-        Log (DEBUG_ERROR,
-                "fail, discard http response(not connect app) [%s:%s]\n",
-                p_rsp->body.status_code,
-                p_req->body.data + p_req->body.ind2);
+        if (p_req != NULL)
+        {
+            Log (DEBUG_ERROR,
+                    "fail, discard http response(not connect app) [%s:%s]\n",
+                    p_rsp->body.status_code,
+                    p_req->body.data + p_req->body.ind2);
+        }
     }
     try_finally;
 
-    e_code = free_pending_queue_eigw_handle (p_handle, &p_tmp);
+
+    if (p_req != NULL)
+    {
+        e_code = free_pending_queue_eigw_handle (p_handle, &p_tmp);
+    }
 
     return (e_code);
 }

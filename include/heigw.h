@@ -77,6 +77,7 @@ typedef struct stMsgHeader{
 	u_char		ucReserved;	Reserved
 }_MSG_HEADER;
  -------------------------------------------------------------------------- */
+#define EIGW_HEADER_FRAME_VALUE    0xFEFE
 
 typedef _MSG_HEADER                 st_eigw_request_header_t;
 typedef st_eigw_request_header_t   *pst_eigw_request_header_t;

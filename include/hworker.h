@@ -23,6 +23,7 @@
 #include <heigw.h>
 #include <hcurl.h>
 #include <hfcgi.h>
+#include <hauth.h>
 
 
 /* ------------------------------------------------------------------------
@@ -70,6 +71,7 @@ typedef struct _st_process_handle_t
     pst_log_handle_t        p_trace;
 
     /*  client required handle  */
+    pst_auth_handle_t       p_auth;
     pst_http_handle_t       p_http;
     pst_eigw_handle_t       p_eigw;
 

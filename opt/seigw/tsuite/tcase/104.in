@@ -3,7 +3,7 @@
 #-------------------------------------------------------------
 
 [TEST_CASE_INPUT]
-HEADER_GWRTVAL = 9998
+HEADER_GWRTVAL = 4321 
 
 NF             = UDR
 METHOD         = GET

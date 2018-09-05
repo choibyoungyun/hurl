@@ -3,7 +3,6 @@
 # ###########################################################################
 #  DEFINE Package Base Directory
 # ###########################################################################
-WORKHOME	= $(HOME)/workspace/KT114
 REST_HOME   = $(HOME)/workspace/hurl
 INSTALL_DEST= $(HOME)/bin
 
@@ -35,7 +34,7 @@ INC_DIR =  -I../include	\
 LIB_DIR = -L../lib \
 		  -L$(HOME)/lib \
 		  -L$(WORKHOME)/lib
-LIBS    = -lhgw -ljlog -lcfg -lfile -lsignal -lshm -lbase -lcurl -lpthread
+LIBS    = -lhgw -ljson -ljlog -lcfg -lfile -lsignal -lshm -lbase -lcurl -lpthread
 
 all: program1  program2
 program1 : $(OBJS1)

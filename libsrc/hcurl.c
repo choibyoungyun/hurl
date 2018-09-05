@@ -210,16 +210,16 @@ process_http_rsp_done (pst_http_handle_t p_handle)
 
         if ((p_msg != NULL) && (p_msg->msg == CURLMSG_DONE))
         {
-           (void) curl_easy_getinfo (p_msg->easy_handle,
-                                     CURLINFO_PRIVATE,
-                                     &p_req);
+            (void) curl_easy_getinfo (p_msg->easy_handle,
+                                      CURLINFO_PRIVATE,
+                                      &p_req);
 
-           (void) curl_easy_getinfo (p_msg->easy_handle,
-                                     CURLINFO_EFFECTIVE_URL,
-                                     &p_req->rsp.p_done_url);
-           (void) curl_easy_getinfo (p_msg->easy_handle,
-                                     CURLINFO_RESPONSE_CODE,
-                                     &p_req->rsp.status_code);
+            (void) curl_easy_getinfo (p_msg->easy_handle,
+                                      CURLINFO_EFFECTIVE_URL,
+                                      &p_req->rsp.p_done_url);
+            (void) curl_easy_getinfo (p_msg->easy_handle,
+                                      CURLINFO_RESPONSE_CODE,
+                                      &p_req->rsp.status_code);
 
            /* --------------------------------------------------------------
             * ISSUE: memory leak if you do not call eay_clsenup
@@ -227,13 +227,17 @@ process_http_rsp_done (pst_http_handle_t p_handle)
             * MUST NOT free it - it gets freed when you call
             * curl_easy_cleanup on the corresponding CURL handle.
             * ------------------------------------------------------------- */
-           (void) curl_easy_getinfo (p_msg->easy_handle,
+            (void) curl_easy_getinfo (p_msg->easy_handle,
                                      CURLINFO_CONTENT_TYPE,
                                      &p_req->rsp.p_content_type);
 
-           (void) curl_easy_getinfo (p_msg->easy_handle,
+            (void) curl_easy_getinfo (p_msg->easy_handle,
                                      CURLINFO_CONTENT_LENGTH_DOWNLOAD,
                                      &p_req->rsp.content_length);
+
+            /*  timer off (option) */
+            (void) curl_easy_setopt  (p_msg->easy_handle,
+                                      CURLOPT_TIMEOUT,   0L);
 
             if (p_req->pf_resp != NULL)
             {
@@ -716,11 +720,11 @@ init_http_request (pst_http_handle_t    p_handle,
         p_now->p_context = p_tmp;
     }
 
-    p_now->p_multi               = p_handle;
-    p_now->is_done               = BOOL_FALSE;
+    p_now->p_multi                = p_handle;
+    p_now->is_done                = BOOL_FALSE;
     p_now->rsp.p_header->now_size = 0;
     p_now->rsp.p_body->now_size   = 0;
-    p_now->pf_resp               = pf_resp;
+    p_now->pf_resp                = pf_resp;
 
     /* --------------------------------------------------------------
      *  NOT USED

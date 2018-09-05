@@ -39,12 +39,12 @@
 #define CURLPIPE_MULTIPLEX 0
 #endif
 
+
 typedef enum _e_http_result_state_t
 {
     HTTP_RESULT_OK  = 200,
     HTTP_RESULT_NOK = 999
 } e_http_result_state_t;
-
 
 
 /* **************************************************************************
@@ -84,6 +84,7 @@ typedef struct _st_http_request_t
 {
     /*  http handle   pointer       */
     void                    *p_multi;
+
     CURL                    *p_context;
 
     /*  http request infomation     */
@@ -237,11 +238,14 @@ typedef struct _st_http_handle_t
     /* UV  loop handle                          */
     uv_loop_t               *p_loop;
     uv_timer_t              timer;
+    curl_socket_t           sockfd;
 #endif
 
     /* CURL multi handle                        */
     CURLM                   *p_context;
-    curl_socket_t           sockfd;
+
+    /* OAUTH handle                             */
+    void                    *p_auth;
 
     /* last result code. (include/curl/multi.h) */
     CURLMcode               err_code;

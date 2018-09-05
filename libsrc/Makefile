@@ -3,7 +3,6 @@
 # ###########################################################################
 #  DEFINE Package Base Directory
 # ###########################################################################
-WORKHOME	= $(HOME)/workspace/KT114
 REST_HOME   = $(HOME)/workspace/hurl
 INSTALL_DEST= ../lib
 
@@ -18,6 +17,7 @@ CC			= g++
 PROGRAM1= libhgw.a
 SRCS1   = worker.c \
 		  hcurl.c \
+		  auth.c \
 		  eigw.c \
 		  fcgi.c \
 		  mchunk.c \

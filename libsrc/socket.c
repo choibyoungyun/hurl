@@ -82,7 +82,7 @@ set_addrinfo_handle (pst_socket_addr_t   p_addr,
 
 
 /* **************************************************************************
- *  @brief          show_handle
+ *  @brief          display socket property
  *  @version
  *  @ingroup
  *  @date
@@ -93,8 +93,8 @@ set_addrinfo_handle (pst_socket_addr_t   p_addr,
  * **************************************************************************/
 static
 void
-show_handle (pst_socket_handle_t   p_handle,
-             char                  *p_mname)
+show_socket_handle (pst_socket_handle_t   p_handle,
+                    char                  *p_mname)
 {
     char    *p_name = (char *)"SOCKET";
 
@@ -148,8 +148,8 @@ show_handle (pst_socket_handle_t   p_handle,
  * **************************************************************************/
 static
 e_error_code_t
-set_timeout_handle (pst_socket_handle_t p_handle,
-                    char                *p_arg)
+set_timeout_socket_handle (pst_socket_handle_t p_handle,
+                           char                *p_arg)
 {
     e_error_code_t  e_code = E_SUCCESS;
     char            buf [DEFAULT_STRING_BUF_LEN];
@@ -210,7 +210,7 @@ set_timeout_handle (pst_socket_handle_t p_handle,
 
 
 /* **************************************************************************
- *  @brief          set_option_handle
+ *  @brief          set socket option property
  *  @version
  *  @ingroup
  *  @date
@@ -219,8 +219,8 @@ set_timeout_handle (pst_socket_handle_t p_handle,
  * **************************************************************************/
 static
 e_error_code_t
-set_option_handle (pst_socket_handle_t p_handle,
-                   char                *p_arg)
+set_option_socket_handle (pst_socket_handle_t p_handle,
+                          char                *p_arg)
 {
     e_error_code_t  e_code = E_SUCCESS;
     char            buf [DEFAULT_STRING_BUF_LEN];
@@ -283,7 +283,7 @@ set_option_handle (pst_socket_handle_t p_handle,
 
 
 /* **************************************************************************
- *  @brief          set_ipaddr_handle
+ *  @brief          set ip address property
  *  @version
  *  @ingroup
  *  @date
@@ -292,8 +292,8 @@ set_option_handle (pst_socket_handle_t p_handle,
  * **************************************************************************/
 static
 e_error_code_t
-set_ipaddr_handle (pst_socket_handle_t p_handle,
-                   char                *p_arg)
+set_ipaddr_socket_handle (pst_socket_handle_t p_handle,
+                          char                *p_arg)
 {
     e_error_code_t  e_code = E_SUCCESS;
     char            buf [DEFAULT_STRING_BUF_LEN];
@@ -370,17 +370,17 @@ set_ipaddr_handle (pst_socket_handle_t p_handle,
 
 
 /* **************************************************************************
- *  @brief          set_handle
+ *  @brief          set socket property
  *  @version
  *  @ingroup
  *  @date
  *  @author
- *  @retval         integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 static
 e_error_code_t
-set_handle (pst_socket_handle_t p_handle,
-            char                *p_arg)
+set_socket_handle (pst_socket_handle_t p_handle,
+                   char                *p_arg)
 {
     e_error_code_t  e_code = E_SUCCESS;
     char            buf [DEFAULT_STRING_BUF_LEN];
@@ -407,15 +407,15 @@ set_handle (pst_socket_handle_t p_handle,
     }
 
 
-    try_exception ((e_code = set_option_handle  (p_handle, p_arg))
+    try_exception ((e_code = set_option_socket_handle  (p_handle, p_arg))
                    != E_SUCCESS,
                    exception_set_option);
 
-    try_exception ((e_code = set_timeout_handle (p_handle, p_arg))
+    try_exception ((e_code = set_timeout_socket_handle (p_handle, p_arg))
                    != E_SUCCESS,
                    exception_set_option);
 
-    try_exception ((e_code = set_ipaddr_handle  (p_handle, p_arg))
+    try_exception ((e_code = set_ipaddr_socket_handle  (p_handle, p_arg))
                    != E_SUCCESS,
                    exception_set_option);
 
@@ -451,7 +451,7 @@ set_handle (pst_socket_handle_t p_handle,
  * **************************************************************************/
 static
 e_error_code_t
-close_handle (pst_socket_handle_t   p_handle)
+close_socket_handle (pst_socket_handle_t   p_handle)
 {
     e_error_code_t  e_code = E_SUCCESS;
     struct  linger  solinger = {1, 0};
@@ -476,7 +476,7 @@ close_handle (pst_socket_handle_t   p_handle)
 
 
 /* **************************************************************************
- *  @brief          recv_handle
+ *  @brief          recv message from socket handle
  *  @version
  *  @ingroup
  *  @date
@@ -487,12 +487,11 @@ close_handle (pst_socket_handle_t   p_handle)
  *  @param [IN]     micro_second - recv time out micor second
  *  @retval         integer
  * **************************************************************************/
-
 static
 e_error_code_t
-recv_handle (pst_socket_handle_t    p_sock,
-             int                    total_length,
-             int                    *p_recv_length)
+recv_socket_handle (pst_socket_handle_t    p_sock,
+                    int                    total_length,
+                    int                    *p_recv_length)
 {
     e_error_code_t  e_code        = E_SUCCESS;
     int             ret           = 0;
@@ -584,7 +583,7 @@ recv_handle (pst_socket_handle_t    p_sock,
 
 
 /* **************************************************************************
- *  @brief          send_socket
+ *  @brief          send message socket handle
  *  @version
  *  @ingroup
  *  @date
@@ -593,13 +592,12 @@ recv_handle (pst_socket_handle_t    p_sock,
  *  @param [IN]     p_buf        - recv buf
  *  @param [IN]     length       - recv length
  *  @param [IN]     micro_second - recv time out micor second
- *  @retval         integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
-
 static
 e_error_code_t
-send_handle (pst_socket_handle_t    p_sock,
-             int                    total_length)
+send_socket_handle (pst_socket_handle_t    p_sock,
+                    int                    total_length)
 {
     e_error_code_t  e_code        = E_SUCCESS;
     int             flag          = 0;
@@ -671,17 +669,16 @@ send_handle (pst_socket_handle_t    p_sock,
 
 
 /* **************************************************************************
- *  @brief          connect_handle
+ *  @brief          connect to peer
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @retval         integer
  * **************************************************************************/
-
 static
 e_error_code_t
-connect_handle (pst_socket_handle_t    p_handle)
+connect_socket_handle (pst_socket_handle_t    p_handle)
 {
     e_error_code_t  e_code   = E_SUCCESS;
     int             opt      = 1;
@@ -752,18 +749,17 @@ connect_handle (pst_socket_handle_t    p_handle)
 
 
 /* **************************************************************************
- *  @brief          listen_handle
+ *  @brief          listen
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN]     p_handle - socket handle
- *  @retval         integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
-
 static
 e_error_code_t
-listen_handle (pst_socket_handle_t   p_handle)
+listen_socket_handle (pst_socket_handle_t   p_handle)
 {
     e_error_code_t  e_code = E_SUCCESS;
     int             option = 1;
@@ -823,20 +819,19 @@ listen_handle (pst_socket_handle_t   p_handle)
 
 
 /* **************************************************************************
- *  @brief          accept_handle
+ *  @brief          accept socket
  *  @version
  *  @ingroup
  *  @date
  *  @author
- *  @param [IN]     argc
- *  @param [IN]     argv
- *  @retval         integer
+ *  @param [IN ]    LOCAL HANDLE
+ *  @param [OUT]    REMOTE HANDLE
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
-
 static
 e_error_code_t
-accept_handle (pst_socket_handle_t    p_local,
-               pst_socket_handle_t    *pp_remote)
+accept_socket_handle (pst_socket_handle_t    p_local,
+                      pst_socket_handle_t    *pp_remote)
 {
     e_error_code_t      e_code   = E_SUCCESS;
     pst_socket_handle_t p_remote = NULL;
@@ -848,7 +843,7 @@ accept_handle (pst_socket_handle_t    p_local,
 
     if (p_local->sfd < 0)
     {
-        try_exception (listen_handle (p_local)  != E_SUCCESS,
+        try_exception (listen_socket_handle (p_local)  != E_SUCCESS,
                        exception_listen_socket);
     }
 
@@ -930,6 +925,7 @@ accept_handle (pst_socket_handle_t    p_local,
 
 
 
+
 /* **************************************************************************
  *  @brief          init_socket
  *  @version
@@ -941,7 +937,6 @@ accept_handle (pst_socket_handle_t    p_local,
  *  @param [IN]     p_section - config section name
  *  @retval         E_SUCCESS/else
  * **************************************************************************/
-
 e_error_code_t
 init_socket_handle (pst_socket_handle_t    *pp_handle,
                     char                   *p_cfname,
@@ -961,19 +956,20 @@ init_socket_handle (pst_socket_handle_t    *pp_handle,
     {
         strcpy (p_handle->csection, p_section);
     }
-    try_exception ((e_code = set_handle (p_handle, p_section)) != E_SUCCESS,
+    try_exception ((e_code = set_socket_handle (p_handle, p_section))
+                   != E_SUCCESS,
                    exception_init_socket);
 
 
     p_handle->sfd = -1;
 
     /*  define member function */
-    p_handle->pf_connect = connect_handle;
-    p_handle->pf_recv    = recv_handle;
-    p_handle->pf_send    = send_handle;
-    p_handle->pf_close   = close_handle;
-    p_handle->pf_accept  = accept_handle;
-    p_handle->pf_show    = show_handle;
+    p_handle->pf_connect = connect_socket_handle;
+    p_handle->pf_recv    = recv_socket_handle;
+    p_handle->pf_send    = send_socket_handle;
+    p_handle->pf_close   = close_socket_handle;
+    p_handle->pf_accept  = accept_socket_handle;
+    p_handle->pf_show    = show_socket_handle;
 
     (*pp_handle) = p_handle;
 
@@ -1000,7 +996,6 @@ init_socket_handle (pst_socket_handle_t    *pp_handle,
  *  @param [IN]     argv
  *  @retval         integer
  * **************************************************************************/
-
 e_error_code_t
 destroy_socket_handle (pst_socket_handle_t *pp_handle)
 {
