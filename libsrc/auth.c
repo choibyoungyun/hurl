@@ -198,9 +198,16 @@ save_auth_handle (pst_auth_handle_t  p_handle,
 
     memset (p_handle->auth_header, 0x00, sizeof (p_handle->auth_header));
     snprintf (p_handle->auth_header, sizeof (p_handle->auth_header) - 1,
-             "Authorization: %s %s",
+             "%s: %s %s",
+              (char *)OAUTH_REQUEST_AUTH_HEADER_FIELD,
               p_handle->token.token_type,
               p_handle->token.access_token);
+
+    memset (p_handle->cache_header, 0x00, sizeof (p_handle->cache_header));
+    snprintf (p_handle->cache_header, sizeof (p_handle->cache_header) - 1,
+             "%s: %s",
+              (char *)OAUTH_REQUEST_CACHE_HEADER_FIELD,
+              (char *)OAUTH_REQUEST_CACHE_HEADER_VALUE);
 
     return (e_code);
 }
@@ -256,9 +263,16 @@ load_auth_handle (pst_auth_handle_t  p_handle)
 
     memset (p_handle->auth_header, 0x00, sizeof (p_handle->auth_header));
     snprintf (p_handle->auth_header, sizeof (p_handle->auth_header) - 1,
-             "Authorization: %s %s",
+             "%s: %s %s",
+              (char *)OAUTH_REQUEST_AUTH_HEADER_FIELD,
               p_handle->token.token_type,
               p_handle->token.access_token);
+
+    memset (p_handle->cache_header, 0x00, sizeof (p_handle->cache_header));
+    snprintf (p_handle->cache_header, sizeof (p_handle->cache_header) - 1,
+             "%s: %s",
+              (char *)OAUTH_REQUEST_CACHE_HEADER_FIELD,
+              (char *)OAUTH_REQUEST_CACHE_HEADER_VALUE);
 
     return (e_code);
 }
@@ -278,68 +292,78 @@ load_auth_handle (pst_auth_handle_t  p_handle)
 static
 e_error_code_t
 setopt_auth_request (pst_auth_handle_t    p_auth,
-                     pst_http_request_t   p_http_req)
+                     pst_http_request_t   p_req)
 {
     e_error_code_t      e_code    = E_SUCCESS;
-    CURL                *p_handle = p_http_req->p_context;
-    char                post_field [1024] = {0,};
-    char                uri [1024] = {0,};
+    CURL                *p_handle = p_req->p_context;
+    char                post_field [HTTP_MAX_HEADER_VALUE_LEN] = {0,};
+    char                uri [HTTP_MAX_HEADER_LEN] = {0,};
 
 
-    set_auth_postfield (p_auth, post_field);
-    sprintf (uri, "%s?%s",p_http_req->uri, post_field);
-    p_http_req->err_code = curl_easy_setopt (p_handle,
-                                             CURLOPT_URL,
-                                             uri);
-    try_exception (p_http_req->err_code != CURLE_OK,
+    /* --------------------------------------------------------------------
+     *  COMMON option
+     * -------------------------------------------------------------------  */
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_HTTP_VERSION,
+                                        p_auth->hversion);
+    try_exception (p_req->err_code != CURLE_OK,
+                        exception_setopt_http_request);
+
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_CONNECTTIMEOUT_MS,
+                                        1000);
+    try_exception (p_req->err_code != CURLE_OK,
+                        exception_setopt_http_request);
+
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_TIMEOUT_MS,
+                                        1000);
+    try_exception (p_req->err_code != CURLE_OK,
                         exception_setopt_http_request);
 
     /* --------------------------------------------------------------------
-     *  method option
-     *   GET  - CURLOPT_OAUTHGET
-     *   PUT  - CURLOPT_PUT
-     *   POST - CURLOPT_OAUTHPOST
-     *   ELSE - CURLOPT_CUSTOMREQUEST
-     *
-     *  curl_easy_setopt (p_handle, CURLOPT_CUSTOMREQUEST,"DELETE");
+     *  URI option
+     * -------------------------------------------------------------------  */
+    (void) set_auth_postfield (p_auth, post_field);
+    sprintf (uri, "%s?%s",p_req->uri, post_field);
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_URL,
+                                        uri);
+    try_exception (p_req->err_code != CURLE_OK,
+                        exception_setopt_http_request);
+
+    /* --------------------------------------------------------------------
+     *  METHOD option
      * -------------------------------------------------------------------  */
     try_exception (curl_easy_setopt (p_handle,
                                      CURLOPT_CUSTOMREQUEST,
-                                     p_http_req->method)
+                                     p_req->method)
                    != CURLE_OK,
                    exception_setopt_http_request);
-    try_exception (p_http_req->err_code != CURLE_OK,
+    try_exception (p_req->err_code != CURLE_OK,
                     exception_setopt_http_request);
 
     /* --------------------------------------------------------------------
-     *  header option
-     *  curl_easy_setopt (p_handle, CURLOPT_OAUTHHEADER,"DELETE");
+     *  HEADER option
      * -------------------------------------------------------------------  */
-    if (p_http_req->p_header == NULL)
-    {
-        p_http_req->p_header
-            = curl_slist_append (p_http_req->p_header,
-                                 p_auth->accept_type);
-        p_http_req->p_header
-            = curl_slist_append (p_http_req->p_header,
-                                 p_auth->content_type);
+    p_req->p_header
+        = curl_slist_append (p_req->p_header,
+                             p_auth->accept_type);
 
-        p_http_req->err_code = curl_easy_setopt (p_handle,
-                                               CURLOPT_HTTPHEADER,
-                                               p_http_req->p_header);
-        try_exception (p_http_req->err_code != CURLE_OK,
-                            exception_setopt_http_request);
-    }
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_HTTPHEADER,
+                                        p_req->p_header);
+    try_exception (p_req->err_code != CURLE_OK,
+                        exception_setopt_http_request);
 
 
-    p_http_req->err_code = curl_easy_setopt (p_handle,
-                                           CURLOPT_USERAGENT,
-               ((pst_http_handle_t)(p_http_req->p_multi))->header.agent_name);
-    try_exception (p_http_req->err_code != CURLE_OK,
+    p_req->err_code = curl_easy_setopt (p_handle,
+                                        CURLOPT_USERAGENT,
+               ((pst_http_handle_t)(p_req->p_multi))->header.agent_name);
+    try_exception (p_req->err_code != CURLE_OK,
                             exception_setopt_http_request);
 
 
-    set_auth_postfield (p_auth, post_field);
     /*
     try_exception (curl_easy_setopt (p_handle,
                                      CURLOPT_POSTFIELDS, post_field)
@@ -347,23 +371,13 @@ setopt_auth_request (pst_auth_handle_t    p_auth,
                    exception_setopt_http_request);
                    */
 
-    curl_easy_setopt(p_handle,  CURLOPT_CONNECTTIMEOUT_MS, 1000);
-    curl_easy_setopt(p_handle,  CURLOPT_TIMEOUT_MS, 1000);
-
-    curl_easy_setopt (p_handle, CURLOPT_HTTP_VERSION, p_auth->hversion);
-
-
     try_catch (exception_setopt_http_request)
     {
-        p_http_req->err_string [sizeof(p_http_req->err_string) - 1] = 0x00;
-        strncpy (p_http_req->err_string,
-                 curl_easy_strerror(p_http_req->err_code),
-                 sizeof (p_http_req->err_string) - 1);
-
+        HTTP_REQUEST_INTERNAL_ERROR (p_req);
         Log (DEBUG_ERROR,
                 "fail, set http option (%d, %s)\n",
-                p_http_req->err_code,
-                p_http_req->err_string);
+                p_req->err_code,
+                p_req->err_string);
 
         e_code = E_PROTOCOL_HTTP_SETOPT;
     }
@@ -395,38 +409,41 @@ recv_auth_handle (pst_http_request_t p_http)
     pst_auth_handle_t   p_handle = NULL;
 
 
+    Log (DEBUG_INFO, "info, [HEADER ] %s\n", p_http->rsp.p_header->p_mem);
+    Log (DEBUG_INFO, "info, [BODY   ] %s\n", p_http->rsp.p_body->p_mem);
+
     p_handle = (pst_auth_handle_t) p_http->p_user1;
+    if (p_http->rsp.status_code != HTTP_RESULT_OK)
+    {
+        Log (DEBUG_ERROR,
+                "fail, authorizaiton token request (%d, %s)\n",
+                p_http->rsp.status_code,
+                p_http->rsp.p_done_url);
 
-    /* -----------------------------------------------------------------
-     * unset timeout option
-     * ----------------------------------------------------------------- */
-    (void) curl_easy_setopt(p_http, CURLOPT_TIMEOUT,   0L);
+        e_code = E_FAILURE;
+    }
+    else
+    {
+        e_code = save_auth_handle (p_handle,
+                                   p_http->rsp.p_body->p_mem);
+        p_handle->token.expires_tick = time (NULL) + p_handle->token.expires_in;
 
-
-    Log (DEBUG_INFO,
-            "%s", p_http->rsp.p_header->p_mem);
-    Log (DEBUG_INFO,
-            "%s", p_http->rsp.p_body->p_mem);
-
-    e_code = save_auth_handle (p_handle,
-                               p_http->rsp.p_body->p_mem);
-    p_handle->token.expires_tick = time (NULL) + p_handle->token.expires_in;
-
-    Log (DEBUG_CRITICAL,
-            "succ, recv authorization token [access token  : %s]\n",
-            p_handle->token.access_token);
-    Log (DEBUG_CRITICAL,
-            "succ, recv authorization token [refresh_token : %s]\n",
-            p_handle->token.refresh_token);
-    Log (DEBUG_CRITICAL,
-            "succ, recv authorization token [token_type    : %s]\n",
-            p_handle->token.token_type);
-    Log (DEBUG_CRITICAL,
-            "succ, recv authorization token [scope         : %s]\n",
-            p_handle->token.scope);
-    Log (DEBUG_CRITICAL,
-            "succ, recv authorization token [expires_in    : %d]\n",
-            p_handle->token.expires_in);
+        Log (DEBUG_CRITICAL,
+                "succ, recv authorization token [access token  : %s]\n",
+                p_handle->token.access_token);
+        Log (DEBUG_CRITICAL,
+                "succ, recv authorization token [refresh_token : %s]\n",
+                p_handle->token.refresh_token);
+        Log (DEBUG_CRITICAL,
+                "succ, recv authorization token [token_type    : %s]\n",
+                p_handle->token.token_type);
+        Log (DEBUG_CRITICAL,
+                "succ, recv authorization token [scope         : %s]\n",
+                p_handle->token.scope);
+        Log (DEBUG_CRITICAL,
+                "succ, recv authorization token [expires_in    : %d]\n",
+                p_handle->token.expires_in);
+    }
 
     return (e_code);
 }

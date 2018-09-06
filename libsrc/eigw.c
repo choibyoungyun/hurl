@@ -159,7 +159,7 @@ encode_eigw_handle (pst_eigw_request_t      p_req,
      * ---------------------------------------------------------------- */
     memcpy   (&p_rsp->header, &p_req->header, sizeof (p_rsp->header));
     SET_MSGN_TYPE(p_rsp->header.unMsgName, MSG_TYPE_RSP);
-    if (status_code != 200)
+    if (status_code != HTTP_RESULT_OK)
     {
         p_rsp->header.sRet     = (short) status_code;
     }

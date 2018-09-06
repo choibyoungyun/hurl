@@ -190,6 +190,7 @@ process_http_rsp_done (pst_http_handle_t p_handle)
 {
     e_http_error_code_t e_code = E_SUCCESS;
     struct  CURLMsg    *p_msg  = NULL;
+    CURLcode            c_code = CURLE_OK;
     int     msgs_in_queue      = 0;
     pst_http_request_t  p_req  = NULL;
 
@@ -210,30 +211,39 @@ process_http_rsp_done (pst_http_handle_t p_handle)
 
         if ((p_msg != NULL) && (p_msg->msg == CURLMSG_DONE))
         {
-            (void) curl_easy_getinfo (p_msg->easy_handle,
-                                      CURLINFO_PRIVATE,
-                                      &p_req);
+            if ((c_code = curl_easy_getinfo (p_msg->easy_handle,
+                                            CURLINFO_PRIVATE,
+                                            &p_req)) == CURLE_OK)
+            {
 
-            (void) curl_easy_getinfo (p_msg->easy_handle,
-                                      CURLINFO_EFFECTIVE_URL,
-                                      &p_req->rsp.p_done_url);
-            (void) curl_easy_getinfo (p_msg->easy_handle,
-                                      CURLINFO_RESPONSE_CODE,
-                                      &p_req->rsp.status_code);
+                (void)
+                curl_easy_getinfo (p_msg->easy_handle, CURLINFO_EFFECTIVE_URL,
+                                   &p_req->rsp.p_done_url);
 
-           /* --------------------------------------------------------------
-            * ISSUE: memory leak if you do not call eay_clsenup
-            * The ct pointer will be NULL or pointing to private memory you
-            * MUST NOT free it - it gets freed when you call
-            * curl_easy_cleanup on the corresponding CURL handle.
-            * ------------------------------------------------------------- */
-            (void) curl_easy_getinfo (p_msg->easy_handle,
-                                     CURLINFO_CONTENT_TYPE,
-                                     &p_req->rsp.p_content_type);
+                /* --------------------------------------------------------
+                 *  The stored value will be zero
+                 *  if no server response code has been received
+                 *  (HTTP_RESULT_UNKNOWN = 0)
+                 * -------------------------------------------------------- */
+                (void)
+                curl_easy_getinfo (p_msg->easy_handle, CURLINFO_RESPONSE_CODE,
+                                   &p_req->rsp.status_code);
 
-            (void) curl_easy_getinfo (p_msg->easy_handle,
-                                     CURLINFO_CONTENT_LENGTH_DOWNLOAD,
-                                     &p_req->rsp.content_length);
+                (void)
+                curl_easy_getinfo (p_msg->easy_handle, CURLINFO_CONTENT_TYPE,
+                                   &p_req->rsp.p_content_type);
+
+                (void)
+                curl_easy_getinfo (p_msg->easy_handle,
+                                   CURLINFO_CONTENT_LENGTH_DOWNLOAD,
+                                   &p_req->rsp.content_length);
+            }
+            else
+            {
+                p_req->rsp.status_code = HTTP_RESULT_UNKNOWN;
+                p_req->err_code        = c_code;
+                HTTP_REQUEST_INTERNAL_ERROR(p_req);
+            }
 
             /*  timer off (option) */
             (void) curl_easy_setopt  (p_msg->easy_handle,
@@ -245,6 +255,8 @@ process_http_rsp_done (pst_http_handle_t p_handle)
             }
 
             /*  for removing from  multi-block */
+            if (p_req->p_header) curl_slist_free_all (p_req->p_header);
+            p_req->p_header = NULL;
             p_req->is_done = BOOL_TRUE;
 
             (*p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue, p_req);
@@ -724,6 +736,7 @@ init_http_request (pst_http_handle_t    p_handle,
     p_now->is_done                = BOOL_FALSE;
     p_now->rsp.p_header->now_size = 0;
     p_now->rsp.p_body->now_size   = 0;
+    p_now->rsp.status_code        = HTTP_RESULT_UNKNOWN;
     p_now->pf_resp                = pf_resp;
 
     /* --------------------------------------------------------------
@@ -760,6 +773,7 @@ init_http_request (pst_http_handle_t    p_handle,
 
     return (e_code);
 }
+
 
 
 
@@ -949,7 +963,9 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
     }
     try_finally;
 
+    /*
     (void) process_http_rsp_done (p_handle);
+    */
 
     return (e_code);
 }
