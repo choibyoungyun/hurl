@@ -3,7 +3,7 @@
 #-------------------------------------------------------------
 
 [TEST_CASE_INPUT]
-HEADER_NAME    = 0
+HEADER_NAME    = 9 
 NF             = UDR
 METHOD         = GET
 URI            = https://udr.jdin.com:8081/restapi/env_fcgi

@@ -1,11 +1,11 @@
 #-------------------------------------------------------------
-# DESC (1001) : OAUTH (GET REQUEST)
+# DESC (1003) : OAUTH (PATCH REQUEST)
 #-------------------------------------------------------------
 
 [TEST_CASE_INPUT]
 NF             = UDR
-METHOD         = GET
-URI            = http://192.168.0.208:8080/users/z00001
+METHOD         = PATCH
+URI            = http://192.168.0.208:8080/users?ID=z00001&CTI_ID=1220000001&GRADE=0&DEPARTMENT_ID=0&NAME=z00001&PASSWD=12345&USED_F=1
 CONTENT_TYPE   =
 CONTENT_LENGTH = 0
 ADD_HEADER     =

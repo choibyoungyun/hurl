@@ -1,11 +1,11 @@
 #-------------------------------------------------------------
-# DESC (1001) : OAUTH (GET REQUEST)
+# DESC (1004) : OAUTH (DELETE REQUEST)
 #-------------------------------------------------------------
 
 [TEST_CASE_INPUT]
 NF             = UDR
-METHOD         = GET
-URI            = http://192.168.0.208:8080/users/z00001
+METHOD         = DELETE
+URI            = http://192.168.0.208:8080/users?ID=z00001
 CONTENT_TYPE   =
 CONTENT_LENGTH = 0
 ADD_HEADER     =
