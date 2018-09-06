@@ -17,14 +17,14 @@
 
 
 /* **************************************************************************
- *	@brief			set_process
+ *  @brief          set_process
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN/OUT] PROCESS HANDLE
- *  @param [IN] 	argv
- *  @retval     	E_SUCCESS/E_FAILURE
+ *  @param [IN]     argv
+ *  @retval         E_SUCCESS/E_FAILURE
  * **************************************************************************/
 static
 e_error_code_t
@@ -65,25 +65,25 @@ set_process (pst_process_handle_t p_handle,
 
 
 /* **************************************************************************
- *	@brief			get_option
+ *  @brief          get_option
  *  @version
  *  @ingroup
  *  @date
  *  @author
- *  @param [IN]		argc
- *  @param [IN] 	argv
- *  @param [IN/OUT]	PROCESS HANDLE
- *  @retval     	E_SUCCESS/E_FAILURE
+ *  @param [IN]     argc
+ *  @param [IN]     argv
+ *  @param [IN/OUT] PROCESS HANDLE
+ *  @retval         E_SUCCESS/E_FAILURE
  * **************************************************************************/
 static
 e_error_code_t
 get_option (int argc, char **argv, pst_process_handle_t p_handle)
 {
-    e_error_code_t	e_code;
+    e_error_code_t  e_code;
     int             opt;
 
 
-    /* initialize	local	variable    */
+    /* initialize   local   variable    */
     e_code = E_SUCCESS;
 
     while ((opt = getopt(argc, argv, "i:f:")) != -1)

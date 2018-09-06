@@ -37,8 +37,8 @@ opensocket_callback (void *p_clientp,
 
 
 /* **************************************************************************
- *	@brief      setopt_http_request
- *	@version
+ *  @brief      setopt_http_request
+ *  @version
  *  @ingroup
  *  @date
  *  @author
@@ -85,8 +85,8 @@ setopt_http_request (pst_http_request_t   p_req)
 
 
 /* **************************************************************************
- *	@brief      process_http_response
- *	@version
+ *  @brief      process_http_response
+ *  @version
  *  @ingroup
  *  @date
  *  @author

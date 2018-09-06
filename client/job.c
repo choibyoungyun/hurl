@@ -18,8 +18,8 @@
 
 
 /* **************************************************************************
- *	@brief      send http response to EIGW
- *	@version
+ *  @brief      send http response to EIGW
+ *  @version
  *  @ingroup
  *  @date
  *  @author
@@ -36,17 +36,14 @@ send_response_to_app_server (pst_http_request_t p_http)
     st_eigw_response_t  rsp;
 
 
-    /* -----------------------------------------------------------------
-     * unset timeout option
-     * ----------------------------------------------------------------- */
-    (void) curl_easy_setopt (p_http->p_context, CURLOPT_TIMEOUT,   0L);
-
-
+    /* -------------------------------------------------------------------
+     * set  content length
+     * ------------------------------------------------------------------- */
     p_http->rsp.content_length = p_http->rsp.p_body->now_size;
-    /* -----------------------------------------------------------------
-     *  BODY
+
+    /* -------------------------------------------------------------------
      *  ISSUE. TOO BIG SIZE BODY (32K)
-     * ------------------------------------------------------------------ */
+     * ------------------------------------------------------------------- */
     if (p_http->rsp.p_body->now_size
             > EIGW_MAX_MSG_BODY_DATA_LENGTH(st_eigw_response_t))
     {
@@ -54,17 +51,15 @@ send_response_to_app_server (pst_http_request_t p_http)
                  "fail, too long size body [now:%d, max:%d]",
                  p_http->rsp.p_body->now_size,
                  EIGW_MAX_MSG_BODY_DATA_LENGTH(st_eigw_response_t));
-        p_http->rsp.status_code      = 0;
+        p_http->rsp.status_code      = HTTP_RESULT_UNKNOWN;
         p_http->rsp.p_body->now_size = 0;
     }
 
 
-    /*  user defined err */
-    if ((p_http->rsp.status_code == 0)
+    if ((p_http->rsp.status_code == HTTP_RESULT_UNKNOWN)
             || (p_http->rsp.status_code >= E_PROTOCOL_SPEC))
     {
-        /*  user defined error code (do not receive http response) */
-        if (p_http->rsp.status_code == 0)
+        if (p_http->rsp.status_code == HTTP_RESULT_UNKNOWN)
         {
             p_http->rsp.status_code = E_PROTOCOL_SPEC;
         }
@@ -76,13 +71,14 @@ send_response_to_app_server (pst_http_request_t p_http)
                 p_req->body.method,
                 p_req->body.data + p_req->body.ind2,
                 p_http->err_string);
-
     }
     else
     {
-        if ((p_http->rsp.status_code != 200)
-                && (p_http->rsp.content_length == -1))
+        if (p_http->rsp.content_length <= 0)
         {
+            /* -----------------------------------------------------------
+             * copy header to body for sending to EIGW
+             * ----------------------------------------------------------- */
             if (p_http->rsp.p_body->max_size < p_http->rsp.p_header->now_size)
             {
                 char *p_tmp = NULL;
@@ -140,7 +136,7 @@ send_response_to_app_server (pst_http_request_t p_http)
         pst_auth_handle_t p_auth;
 
         p_auth = (pst_auth_handle_t)
-                (((pst_http_handle_t)(p_http->p_multi))->p_auth);
+                 (HTTP_HANDLE_FROM_REQUEST(p_http)->p_auth);
         (void) (p_auth->pf_clean)(p_auth);
     }
 
@@ -151,8 +147,8 @@ send_response_to_app_server (pst_http_request_t p_http)
 
 
 /* **************************************************************************
- *	@brief      setopt_http_header
- *	@version
+ *  @brief      setopt_http_header
+ *  @version
  *  @ingroup
  *  @date
  *  @author
@@ -191,30 +187,12 @@ setopt_http_header (pst_eigw_request_t     p_app_req,
     /* --------------------------------------------------------------------
      * REQUEST APPLICATION HEADER (OAUTH HEADER)
      * -------------------------------------------------------------------- */
-#ifdef _CURL_XOUTH_OPTION /* may be curl bug */
-    if (p_auth && ((p_auth->pf_verify)(p_auth) == E_SUCCESS))
-    {
-        CURLcode            c_code;
-        c_code = curl_easy_setopt (p_handle,
-                                   CURLOPT_HTTPAUTH,
-                                   CURLAUTH_BEARER);
-        c_code = curl_easy_setopt (p_handle,
-                                   CURLOPT_XOAUTH2_BEARER,
-                                   p_auth->token.access_token);
-        if (c_code != CURLE_OK)
-        {
-            Log (DEBUG_ERROR,
-                    "fail, curl option (XOAUTH2) [%s]\n",
-                    curl_easy_strerror(c_code));
-        }
-    }
-#else
     if (p_auth && ((p_auth->pf_verify)(p_auth) == E_SUCCESS))
     {
         p_http_req->p_header = curl_slist_append (p_http_req->p_header,
                                                   p_auth->auth_header);
     }
-#endif
+
     p_http_req->err_code = curl_easy_setopt (p_handle,
                                              CURLOPT_HTTPHEADER,
                                              p_http_req->p_header);
@@ -226,7 +204,8 @@ setopt_http_header (pst_eigw_request_t     p_app_req,
      * -------------------------------------------------------------------- */
     p_http_req->err_code = curl_easy_setopt (p_handle,
                                            CURLOPT_USERAGENT,
-               ((pst_http_handle_t)(p_http_req->p_multi))->header.agent_name);
+               HTTP_HANDLE_FROM_REQUEST(p_http_req)->header.agent_name);
+
     try_exception (p_http_req->err_code != CURLE_OK,
                             exception_setopt_http_request);
 
@@ -242,10 +221,9 @@ setopt_http_header (pst_eigw_request_t     p_app_req,
 
 
 
-
 /* **************************************************************************
- *	@brief      setopt_http_request
- *	@version
+ *  @brief      setopt_http_request
+ *  @version
  *  @ingroup
  *  @date
  *  @author
@@ -266,8 +244,9 @@ setopt_http_request (pst_eigw_request_t     p_app_req,
      *  PROTOCOL VERSION
      * -------------------------------------------------------------------- */
     curl_easy_setopt (p_handle, CURLOPT_HTTP_VERSION,
-                     ((pst_http_handle_t)(p_http_req->p_multi))->hversion);
-    if (((pst_http_handle_t)(p_http_req->p_multi))->hversion == 2)
+                     (HTTP_HANDLE_FROM_REQUEST(p_http_req))->hversion);
+    if ((HTTP_HANDLE_FROM_REQUEST(p_http_req))->hversion
+            == CURL_HTTP_VERSION_1_1 )
     {
         curl_easy_setopt (p_handle, CURLOPT_PIPEWAIT, 1L);
     }
@@ -280,10 +259,10 @@ setopt_http_request (pst_eigw_request_t     p_app_req,
      *  curl_easy_setopt (p_handle, CURLOPT_TIMEOUT_MS, 1);
      * -------------------------------------------------------------------  */
     curl_easy_setopt(p_handle, CURLOPT_CONNECTTIMEOUT_MS,
-            ((pst_http_handle_t)(p_http_req->p_multi))->timer.con_timeout_ms);
+            HTTP_HANDLE_FROM_REQUEST(p_http_req)->timer.con_timeout_ms);
 
     curl_easy_setopt(p_handle, CURLOPT_TIMEOUT_MS,
-            ((pst_http_handle_t)(p_http_req->p_multi))->timer.req_timeout_ms);
+            HTTP_HANDLE_FROM_REQUEST(p_http_req)->timer.req_timeout_ms);
 
     /* --------------------------------------------------------------------
      *  REQUEST URI
@@ -326,15 +305,11 @@ setopt_http_request (pst_eigw_request_t     p_app_req,
 
     try_catch (exception_setopt_http_request)
     {
-        p_http_req->err_string [sizeof(p_http_req->err_string) - 1] = 0x00;
-        strncpy (p_http_req->err_string,
-                 curl_easy_strerror(p_http_req->err_code),
-                 sizeof (p_http_req->err_string) - 1);
-
+        HTTP_REQUEST_INTERNAL_ERROR (p_http_req);
         Log (DEBUG_ERROR,
                 "fail, set http option (%d, %s)\n",
-                p_http_req->err_code,
-                p_http_req->err_string);
+                HTTP_REQUEST_ERROR_CODE(p_http_req),
+                HTTP_REQUEST_ERROR_STRING(p_http_req));
 
         e_code = E_PROTOCOL_HTTP_SETOPT;
     }
@@ -405,8 +380,11 @@ send_request_to_http_server (pst_eigw_handle_t  p_eigw,
     {
         Log (DEBUG_ERROR,
                 "fail, perform http handle (%d, %s)\n",
-                p_http->err_code,
-                p_http->err_string);
+                HTTP_HANDLE_ERROR_CODE (p_http),
+                HTTP_HANDLE_ERROR_STRING (p_http));
+
+        /*  generate core file          */
+        try_assert (1);
     }
 
 

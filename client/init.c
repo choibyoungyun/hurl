@@ -20,13 +20,13 @@ extern e_error_code_t  set_client_id_eigw_handle (pst_eigw_client_id_t);
 
 
 /* **************************************************************************
- *	@brief      set reload/term process flag
- *	@version
+ *  @brief          set reload/term process flag
+ *  @version
  *  @ingroup
  *  @date
  *  @author
- *  @param [IN] process handle
- *  @retval     void
+ *  @param [IN]     process handle
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 static
 e_error_code_t
@@ -48,13 +48,13 @@ set_term_process (pst_process_handle_t    p_handle)
 
 
 /* **************************************************************************
- *	@brief      reload_process
- *	@version
+ *  @brief          reload_process
+ *  @version
  *  @ingroup
  *  @date
  *  @author
- *  @param [IN] process handle
- *  @retval     void
+ *  @param [IN]     process handle
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 static
 e_error_code_t
@@ -70,13 +70,13 @@ reload_process (pst_process_handle_t    p_handle)
 
 
 /* **************************************************************************
- *	@brief			period_process
+ *  @brief          period_process
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN]     PROCESS HANDLE
- *  @retval     	integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 
 static
@@ -109,20 +109,20 @@ period_process (pst_process_handle_t p_handle)
 
 
 /* **************************************************************************
- *	@brief			active process
+ *  @brief          active process
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN/OUT] PROCESS HANDLE
- *  @retval     	integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 
 static
 e_error_code_t
 active_process (pst_process_handle_t p_handle)
 {
-    e_error_code_t	e_code = E_SUCCESS;
+    e_error_code_t  e_code = E_SUCCESS;
 
     UNUSED (p_handle);
     return (e_code);
@@ -132,20 +132,20 @@ active_process (pst_process_handle_t p_handle)
 
 
 /* **************************************************************************
- *	@brief			inactive process
+ *  @brief          inactive process
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN/OUT] PROCESS HANDLE
- *  @retval     	integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 
 static
 e_error_code_t
 inactive_process (pst_process_handle_t p_handle)
 {
-    e_error_code_t	e_code = E_SUCCESS;
+    e_error_code_t  e_code = E_SUCCESS;
 
     UNUSED (p_handle);
     return (e_code);
@@ -155,19 +155,19 @@ inactive_process (pst_process_handle_t p_handle)
 
 
 /* **************************************************************************
- *	@brief			initialize process
+ *  @brief          initialize process
  *  @version
  *  @ingroup
  *  @date
  *  @author
  *  @param [IN/OUT] PROCESS HANDLE
- *  @retval     	integer
+ *  @retval         E_SUCCESS/else
  * **************************************************************************/
 
 e_error_code_t
 init_process (pst_process_handle_t p_handle)
 {
-    e_error_code_t	e_code      = E_SUCCESS;
+    e_error_code_t  e_code      = E_SUCCESS;
 
 
     p_handle->stop_flag   = BOOL_FALSE;
@@ -300,8 +300,8 @@ init_process (pst_process_handle_t p_handle)
 
 
 /* **************************************************************************
- *	@brief            destroy process resource
- *	@version
+ *  @brief            destroy process resource
+ *  @version
  *  @ingroup
  *  @date
  *  @author
