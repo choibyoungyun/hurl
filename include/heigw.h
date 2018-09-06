@@ -67,14 +67,14 @@ typedef struct _st_eigw_client_id_t
 
 /*  ----------------------------------------------------------------------
 typedef struct stMsgHeader{
-	char        cFrame[2];  Message frame, must be set to 0xFEFE
-	u_short  	usLength;   Total message length (Header length + Body length)
-	u_int 		unMsgName;  Message name
-	u_long		ulSeq;	    Message sequence
-	u_int		unGwRteVal; G/W route value
-	short		sRet;		Result
-	u_char		ucVersion;	Version
-	u_char		ucReserved;	Reserved
+    char        cFrame[2];  Message frame, must be set to 0xFEFE
+    u_short     usLength;   Total message length (Header length + Body length)
+    u_int       unMsgName;  Message name
+    u_long      ulSeq;      Message sequence
+    u_int       unGwRteVal; G/W route value
+    short       sRet;       Result
+    u_char      ucVersion;  Version
+    u_char      ucReserved; Reserved
 }_MSG_HEADER;
  -------------------------------------------------------------------------- */
 #define EIGW_HEADER_FRAME_VALUE    0xFEFE

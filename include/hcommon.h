@@ -151,8 +151,10 @@ typedef enum _e_error_code_t
     E_SQL_REMAIN_RESULT,        /* INSUFFICIENT COLUMNS ARRAY   */
 
 
-    /* APPLICATION PROTOCOAL    */
-    E_PROTOCOL_SPEC         = 900,
+    /* APPLICATION(CURL or EIGW) PROTOCOAL    */
+    E_PROTOCOL_HTTP_INTERNAL = 900,
+    E_PROTOCOL_HTTP_SETOPT,
+    E_PROTOCOL_SPEC,
     E_PROTOCOL_INVALID_HEADER,
     E_PROTOCOL_INVALID_HEADER_FRAME,
     E_PROTOCOL_INVALID_HEADER_LENGTH,
@@ -163,8 +165,7 @@ typedef enum _e_error_code_t
     E_PROTOCOL_INVALID_BODY_URI,
     E_PROTOCOL_INVALID_BODY_PROTOCOL,
     E_PROTOCOL_INVALID_BODY_METHOD,
-    E_PROTOCOL_TOO_BIG_RESPONSE,
-    E_PROTOCOL_HTTP_SETOPT
+    E_PROTOCOL_TOO_BIG_RESPONSE
 } e_error_code_t;
 typedef e_error_code_t  e_http_error_code_t;
 typedef e_error_code_t  *pe_http_error_code_t;
@@ -180,5 +181,16 @@ typedef enum _e_bool_t
 } e_bool_t;
 typedef _e_bool_t       e_http_bool_t;
 typedef e_http_bool_t   *pe_http_bool_t;
+
+
+/* ------------------------------------------------------------------------
+ * HTTP STATUS CODE
+ * ------------------------------------------------------------------------ */
+typedef enum _e_http_result_state_t
+{
+    HTTP_RESULT_NOK     = -1,
+    HTTP_RESULT_UNKNOWN = 0,
+    HTTP_RESULT_OK      = 200
+} e_http_result_state_t;
 
 #endif

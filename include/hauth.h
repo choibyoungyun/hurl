@@ -23,49 +23,67 @@
 #include <cmn/lib/util/json/json.h>
 
 
-#ifndef OAUTH_MAX_DOMAIN_LEN
- #define OAUTH_MAX_DOMAIN_LEN           128
-#endif
-
+/* ------------------------------------------------------------------------
+ * HTTP URI (OAUTH REDEFINE)
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_URI_LEN
- #define OAUTH_MAX_URI_LEN              512
+ #define OAUTH_MAX_URI_LEN              HTTP_MAX_URI_LEN
 #endif
 
-#ifndef OAUTH_MAX_HEADER_LEN
- #define OAUTH_MAX_HEADER_LEN           512
-#endif
-
+/* ------------------------------------------------------------------------
+ * OAUTH CLIENT ID
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_CLIENT_ID
  #define OAUTH_MAX_CLIENT_ID_LEN        128
 #endif
 
-
+/* ------------------------------------------------------------------------
+ * OAUTH CLIENT SECRET
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_CLIENT_SECRET_LEN
  #define OAUTH_MAX_CLIENT_SECRET_LEN    512
 #endif
 
+/* ------------------------------------------------------------------------
+ * OAUTH USERNAME
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_USERNAME_LEN
  #define OAUTH_MAX_USERNAME_LEN         128
 #endif
 
+/* ------------------------------------------------------------------------
+ * OAUTH PASSWORD
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_PASSWD_LEN
  #define OAUTH_MAX_PASSWD_LEN           128
 #endif
 
-#ifndef OAUTH_MAX_TOKEN_LEN
- #define OAUTH_MAX_TOKEN_LEN            512
-#endif
-
+/* ------------------------------------------------------------------------
+ * OAUTH SCOPE
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_SCOPE_LEN
  #define OAUTH_MAX_SCOPE_LEN            64
 #endif
 
+/* ------------------------------------------------------------------------
+ * OAUTH EXPIRES_IN
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_EXPIRES_LEN
  #define OAUTH_MAX_EXPIRES_LEN          16
 #endif
 
+/* ------------------------------------------------------------------------
+ * OAUTH TOKEN (ACCESS, REFRESH)
+ * -----------------------------------------------------------------------*/
+#ifndef OAUTH_MAX_TOKEN_LEN
+ #define OAUTH_MAX_TOKEN_LEN            HTTP_MAX_HEADER_VALUE_LEN
+#endif
+
+/* ------------------------------------------------------------------------
+ * OAUTH EXPIRES_IN
+ * -----------------------------------------------------------------------*/
 #ifndef OAUTH_MAX_HEADER_LEN
- #define OAUTH_MAX_HEADER_LEN           (OAUTH_AUTH_MAX_TOKEN_LEN + 128)
+ #define OAUTH_MAX_HEADER_LEN           HTTP_MAX_HEADER_LEN
 #endif
 
 
@@ -131,13 +149,47 @@
 #define OAUTH_CONFIG_VERIFY_TICK_DEFAULT       "5"
 
 /* -----------------------------------------------------------------------
- * DEFINE OAUTH REQUEST HEADER
+ * DEFINE OAUTH REQUEST HEADER (NOT USED CONTENT TYPE)
  * ----------------------------------------------------------------------- */
 #define OAUTH_CONFIG_HEADER_ACCEPT_TYPE_DEFAULT     "application/json"
 #define OAUTH_CONFIG_HEADER_CONTENT_TYPE_DEFAULT    "application/json"
 
 /* -----------------------------------------------------------------------
- * DEFINE OAUTH JSON ATTRIBUTE
+ * DEFINE OAUTH REQUEST HEADER FIELD
+ * - RFC6750. 2.1 Authorization Request Header Field
+ * - When sending the access token in the "Authorization" request header
+ *   field defined by HTTP/1.1 [RFC2617], the client uses the "Bearer"
+ *   authentication scheme to transmit the access token
+ * ----------------------------------------------------------------------- */
+#define OAUTH_REQUEST_AUTH_HEADER_FIELD         "Authorization"
+
+/* -----------------------------------------------------------------------
+ * DEFINE OAUTH REQUEST HEADER FIELD
+ * - SEPC
+ *   RFC6750. 2.3 URI QUERY PARAMTER
+ *   Clients using the URI Query Parameter method SHOULD also send
+ *   a Cache-Control header containing the "no-store" option
+ * - PROTRM : NOT USED
+ * ----------------------------------------------------------------------- */
+#define OAUTH_REQUEST_CACHE_HEADER_FIELD        "Cache-Control"
+#define OAUTH_REQUEST_CACHE_HEADER_VALUE        "no-store"
+
+/* -----------------------------------------------------------------------
+ * DEFINE OAUTH RESPONSE HEADER FIELD
+ * - SEPEC
+ *   RFC6750. 3. WWW-Authenticate Response Header
+ *   If the protected resource request does not include authentication
+ *   credentials or does not contain an access token that enables access
+ *   to the protected resource the resource server MUST include
+ *   the HTTP "WWW-Authenticate" response header field
+ *
+ * - PROGRAM : application logs all header & body  (NOT USED HEADER)
+ * ----------------------------------------------------------------------- */
+#define OAUTH_RESPONSE_AUTH_HEADER_FIELD        "WWW-Authenticate"
+
+
+/* -----------------------------------------------------------------------
+ * DEFINE OAUTH RESPONSE JSON ATTRIBUTE
  * ----------------------------------------------------------------------- */
 #define OAUTH_JSON_ACCESS_TOKEN                 "access_token"
 #define OAUTH_JSON_REFRESH_TOKEN                "refresh_token"
@@ -179,9 +231,10 @@ typedef struct _st_auth_handle_t
     /* authorization token save file name && token */
     st_http_auth_token_t        token;
     char                        tfname        [FNAME_STRING_BUF_LEN];
+
     int                         verification_tick;
     char                        auth_header   [OAUTH_MAX_HEADER_LEN];
-
+    char                        cache_header  [OAUTH_MAX_HEADER_LEN];
 
     int                         hversion;
     char                        uri           [OAUTH_MAX_URI_LEN];

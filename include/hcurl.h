@@ -40,11 +40,66 @@
 #endif
 
 
-typedef enum _e_http_result_state_t
-{
-    HTTP_RESULT_OK  = 200,
-    HTTP_RESULT_NOK = 999
-} e_http_result_state_t;
+/* ------------------------------------------------------------------------
+ * HTTP URI
+ * -----------------------------------------------------------------------*/
+#ifndef HTTP_MAX_URI_LEN
+ #define HTTP_MAX_URI_LEN               256
+#endif
+
+/* ------------------------------------------------------------------------
+ * HTTP METHOD
+ * -----------------------------------------------------------------------*/
+#ifndef HTTP_MAX_METHOD_LEN
+ #define HTTP_MAX_METHOD_LEN            32
+#endif
+
+/* ------------------------------------------------------------------------
+ * HTTP DOMAIN
+ * -----------------------------------------------------------------------*/
+#ifndef OAUTH_MAX_DOMAIN_LEN
+ #define OAUTH_MAX_DOMAIN_LEN           128
+#endif
+
+/* ------------------------------------------------------------------------
+ * HTTP HEADER FIELD
+ * -----------------------------------------------------------------------*/
+#ifndef HTTP_MAX_HEADER_FIELD_LEN
+ #define HTTP_MAX_HEADER_FIELD_LEN      64
+#endif
+
+/* ------------------------------------------------------------------------
+ * HTTP HEADER VALUE
+ * -----------------------------------------------------------------------*/
+#ifndef HTTP_MAX_HEADER_VALUE_LEN
+ #define HTTP_MAX_HEADER_VALUE_LEN      512
+#endif
+
+/* ------------------------------------------------------------------------
+ * HTTP HEADER VALUE
+ * -----------------------------------------------------------------------*/
+#ifndef HTTP_MAX_HEADER_LEN
+ #define HTTP_MAX_HEADER_LEN  \
+     (HTTP_MAX_HEADER_FIELD_LEN + HTTP_MAX_HEADER_VALUE_LEN)
+#endif
+
+
+/* ------------------------------------------------------------------------
+ * MACRO : HTTP REQUEST INTERNAL ERROR
+ * -----------------------------------------------------------------------*/
+#define HTTP_HANDLE_FROM_REQUEST(x)     ((pst_http_handle_t)(x->p_multi))
+
+#define HTTP_REQUEST_INTERNAL_ERROR(x) { \
+    (x)->err_string [sizeof((x)->err_string) - 1] = 0x00; \
+    strncpy ((x)->err_string,\
+             curl_easy_strerror((x)->err_code), \
+             sizeof ((x)->err_string) - 1); \
+}
+#define HTTP_REQUEST_ERROR_CODE(x)      ((x)->err_code)
+#define HTTP_REQUEST_ERROR_STRING(x)    ((x)->err_string)
+
+#define HTTP_HANDLE_ERROR_CODE(x)       ((x)->err_code)
+#define HTTP_HANDLE_ERROR_STRING(x)     ((x)->err_string)
 
 
 /* **************************************************************************
@@ -72,12 +127,6 @@ typedef struct _st_http_response_t
     pst_mchunk_handle_t     p_body;
 } st_http_response_t;
 
-
-/* ------------------------------------------------------------------------
- * DEFINE HTTP REQUEST
- * -----------------------------------------------------------------------*/
-#define HTTP_MAX_METHOD_LEN     32
-#define HTTP_MAX_URI_LEN        256
 
 typedef struct _st_http_request_t   *pst_http_request_t;
 typedef struct _st_http_request_t
@@ -107,7 +156,6 @@ typedef struct _st_http_request_t
     /*  member function             */
     e_http_error_code_t     (*pf_resp)    (pst_http_request_t);
     e_http_error_code_t     (*pf_set    ) (pst_http_request_t);
-    e_http_error_code_t     (*pf_perform) (pst_http_request_t);
 } st_http_request_t;
 
 
