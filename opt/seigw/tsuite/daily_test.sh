@@ -76,7 +76,7 @@ function do_verify()
 }
 
 
-if [ $1 = "verify" ]
+if [ "$1" = "verify" ]
 then
     do_test result
 else
