@@ -134,7 +134,7 @@ process_http_rsp_header (char      *p_ptr,
     pst_http_request_t  p_req   = (pst_http_request_t)p_user_data;
     pst_mchunk_handle_t p_chunk = p_req->rsp.p_header;
 
-    if ((*p_chunk->pf_add)(p_chunk, p_ptr, size * nmemb) != E_SUCCESS)
+    if ((p_chunk->pf_add)(p_chunk, p_ptr, size * nmemb) != E_SUCCESS)
         return (0);
 
     return(size * nmemb);
@@ -165,7 +165,7 @@ process_http_rsp_body (char      *p_ptr,
     HTTP_LOG ("succ, receive http body [size:%d, nmemb:%d]\n",
                (int)size, (int)nmemb);
 
-    if ((*p_chunk->pf_add)(p_chunk, p_ptr, size * nmemb) != E_SUCCESS)
+    if ((p_chunk->pf_add)(p_chunk, p_ptr, size * nmemb) != E_SUCCESS)
         return (0);
 
     return(size * nmemb);
@@ -245,21 +245,14 @@ process_http_rsp_done (pst_http_handle_t p_handle)
                 HTTP_REQUEST_INTERNAL_ERROR(p_req);
             }
 
-            /*  timer off (option) */
-            (void) curl_easy_setopt  (p_msg->easy_handle,
-                                      CURLOPT_TIMEOUT,   0L);
-
             if (p_req->pf_resp != NULL)
             {
-                (*p_req->pf_resp)(p_req);
+                (p_req->pf_resp)(p_req);
             }
-
-            /*  for removing from  multi-block */
-            if (p_req->p_header) curl_slist_free_all (p_req->p_header);
-            p_req->p_header = NULL;
             p_req->is_done = BOOL_TRUE;
 
-            (*p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue, p_req);
+            (p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue,
+                                                 p_req);
         }
     } while (p_msg != NULL);
 
@@ -288,20 +281,31 @@ log_http_request (CURL          *p_handle,
                   size_t        size,
                   void          *userp)
 {
-    const char   *text;
+    const char  *text;
+    char        str[1024];
 
     /* prevent compiler warning */
     UNUSED (p_handle);
     UNUSED (userp);
     UNUSED (size);
 
+    if (size > sizeof (str))
+    {
+        memcpy (str, p_data, sizeof (str) - 2);
+        str[sizeof(str) - 1]=0x00;
+    }
+    else
+    {
+        memcpy (str, p_data, size);
+        str[size]=0x00;
+    }
 
     switch (type)
     {
         case CURLINFO_TEXT:
             Log (DEBUG_LOW,
                     "info, (handle:%x:%x) %s",
-                    userp, p_handle, p_data);
+                    userp, p_handle, str);
             /* FALLTHROUGH */
         default: /* in case a new one is introduced to shock us */
             return 0;
@@ -309,12 +313,12 @@ log_http_request (CURL          *p_handle,
         case CURLINFO_HEADER_OUT:
             Log (DEBUG_LOW,
                     "info, (handle:%x:%x) [OUT_HEADER] %s",
-                    userp, p_handle, p_data);
+                    userp, p_handle, str);
             break;
         case CURLINFO_DATA_OUT:
             Log (DEBUG_LOW,
                     "info, (handle:%x:%x) [OUT_BODY  ] %s\n",
-                    userp, p_handle, p_data);
+                    userp, p_handle, str);
             break;
         case CURLINFO_SSL_DATA_OUT:
             text = "=> Send SSL data";
@@ -322,12 +326,12 @@ log_http_request (CURL          *p_handle,
         case CURLINFO_HEADER_IN:
             Log (DEBUG_LOW,
                     "info, (handle:%x:%x) [IN_HEADER ] %s",
-                    userp, p_handle, p_data);
+                    userp, p_handle, str);
             break;
         case CURLINFO_DATA_IN:
             Log (DEBUG_LOW,
                     "info, (handle:%x:%x) [IN_BODY   ] %s\n",
-                    userp, p_handle, p_data);
+                    userp, p_handle, str);
             break;
         case CURLINFO_SSL_DATA_IN:
             text = "<= Recv SSL data";
@@ -396,7 +400,7 @@ setopt_debug_http_request_default (pst_http_request_t   p_req)
      * please be verbose
      * curl_easy_setopt (p_handle, CURLOPT_DEBUGFUNCTION, NULL);
     * --------------------------------------------------------------------- */
-    if (((pst_http_handle_t)(p_req->p_multi))->verbose == BOOL_TRUE)
+    if ((HTTP_HANDLE_FROM_REQUEST(p_req))->verbose == BOOL_TRUE)
     {
         try_exception (curl_easy_setopt (p_handle, CURLOPT_VERBOSE, 1L)
                        != CURLE_OK,
@@ -445,14 +449,14 @@ e_http_error_code_t
 setopt_ssl_http_request_default (pst_http_request_t   p_req)
 {
     e_http_error_code_t e_code    = E_SUCCESS;
-    pst_http_handle_t   p_multi   = (pst_http_handle_t)(p_req->p_multi);
+    pst_http_handle_t   p_multi   = HTTP_HANDLE_FROM_REQUEST(p_req);
     CURL                *p_handle = p_req->p_context;
 
 
     /* ---------------------------------------------------------------------
      *   VERIFY PEER
      *  -------------------------------------------------------------------- */
-    if (((pst_http_handle_t)(p_req->p_multi))->ssl.verify == BOOL_TRUE)
+    if (p_multi->ssl.verify == BOOL_TRUE)
     {
         try_exception (curl_easy_setopt (p_handle, CURLOPT_SSL_VERIFYPEER, 1L)
                        != CURLE_OK,
@@ -688,6 +692,30 @@ setopt_http_request_default (pst_http_request_t   p_req)
 
 
 
+/* **************************************************************************
+ *	@brief      reset_http_request
+ *	@version
+ *  @ingroup
+ *  @date
+ *  @author
+ *  @param
+ *  @retval     int
+ * **************************************************************************/
+static
+e_error_code_t
+reset_http_request (pst_http_request_t  p_handle)
+{
+    e_error_code_t  e_code = E_SUCCESS;
+
+
+    (void) curl_easy_reset (p_handle->p_context);
+    (void) setopt_http_request_default (p_handle);
+
+    return (e_code);
+}
+
+
+
 
 /* **************************************************************************
  *	@brief      init_http_request
@@ -707,48 +735,42 @@ init_http_request (pst_http_handle_t    p_handle,
 {
     e_http_error_code_t e_code = E_SUCCESS;
     pst_http_request_t  p_now  = NULL;
-    CURL                *p_tmp = NULL;
+    CURLMcode           m_code;
 
 
-    e_code = (*p_handle->p_pending_queue->pf_alloc)(p_handle->p_pending_queue,
+    e_code = (p_handle->p_pending_queue->pf_alloc)(p_handle->p_pending_queue,
                                            (void **)&p_now);
     try_exception (e_code != E_SUCCESS, exception_alloc_pool);
 
-
-    /*  remove CURL from CURL MULTI HANDLE */
     if (p_now->is_done == BOOL_TRUE)
     {
-        p_handle->err_code = curl_multi_remove_handle (p_handle->p_context,
-                                                 p_now->p_context);
-        if (p_handle->err_code != CURLM_OK)
+        /*  remove CURL from CURL MULTI HANDLE */
+        m_code = curl_multi_remove_handle (p_handle->p_context,
+                                           p_now->p_context);
+        if (m_code != CURLM_OK)
         {
-            Log (DEBUG_CRITICAL,
-                    "fail, %s\n", curl_multi_strerror (p_handle->err_code));
-            abort();
+            HTTP_HANDLE_INTERNAL_ERROR(p_handle, m_code);
+            return (E_PROTOCOL_HTTP_CRITICAL);
         }
-
-        try_assert((p_tmp = curl_easy_duphandle (p_now->p_context)) == NULL);
-        (void) curl_easy_cleanup (p_now->p_context);
-        p_now->p_context = p_tmp;
     }
+
+    /*  reset easy handle   */
+    (void) (p_now->pf_reset) (p_now);
+    if (p_now->p_header) curl_slist_free_all (p_now->p_header);
+    p_now->p_header = NULL;
 
     p_now->p_multi                = p_handle;
     p_now->is_done                = BOOL_FALSE;
-    p_now->rsp.p_header->now_size = 0;
-    p_now->rsp.p_body->now_size   = 0;
+    (p_now->rsp.p_header->pf_reset)(p_now->rsp.p_header);
+    (p_now->rsp.p_body->pf_reset)  (p_now->rsp.p_body);
     p_now->rsp.status_code        = HTTP_RESULT_UNKNOWN;
     p_now->pf_resp                = pf_resp;
-
-    /* --------------------------------------------------------------
-     *  NOT USED
-     * e_code = setopt_http_request_default(p_now);
-     * ------------------------------------------------------------ */
 
     /*  used defined option */
     if (pf_option != NULL)
     {
         p_now->pf_set = pf_option;
-        try_exception ((e_code = (*p_now->pf_set)(p_now)) != E_SUCCESS,
+        try_exception ((e_code = (p_now->pf_set)(p_now)) != E_SUCCESS,
                        exception_user_callback);
     }
 
@@ -757,15 +779,11 @@ init_http_request (pst_http_handle_t    p_handle,
 
     try_catch (exception_alloc_pool)
     {
-        Log (DEBUG_ERROR,
-                "info, busy http memory pool [%p: total(%d)]\n",
-               p_handle->p_pending_queue,
-               p_handle->p_pending_queue->num_of_block);
         e_code = E_BUSY;
     }
     try_catch (exception_user_callback)
     {
-        (void) (*p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue,
+        (void) (p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue,
                                              (void **)&p_now);
         e_code = E_CALLBACK_FUNCTION;
     }
@@ -810,18 +828,19 @@ destroy_http_request (pst_http_request_t    p_req)
  *  @retval     int
  * **************************************************************************/
 static
-e_http_error_code_t
+e_error_code_t
 add_http_handle (pst_http_handle_t  p_handle,
                  pst_http_request_t p_req)
 {
-    e_http_error_code_t e_code = E_SUCCESS;
+    e_error_code_t  e_code = E_SUCCESS;
+    CURLMcode       m_code;
 
-    p_handle->err_code = curl_multi_add_handle (p_handle->p_context,
+
+    m_code = curl_multi_add_handle (p_handle->p_context,
                                           p_req->p_context);
-    if (p_handle->err_code != CURLM_OK)
+    if (m_code != CURLM_OK)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
+        HTTP_HANDLE_INTERNAL_ERROR (p_handle, m_code);
         e_code = E_FAILURE;
     }
 
@@ -830,18 +849,18 @@ add_http_handle (pst_http_handle_t  p_handle,
 
 
 static
-e_http_error_code_t
+e_error_code_t
 remove_http_handle (pst_http_handle_t  p_handle,
                     pst_http_request_t p_req)
 {
-    e_http_error_code_t e_code = E_SUCCESS;
+    e_error_code_t e_code = E_SUCCESS;
+    CURLMcode       m_code;
 
-    p_handle->err_code = curl_multi_remove_handle (p_handle->p_context,
-                                             p_req->p_context);
-    if (p_handle->err_code != CURLM_OK)
+    m_code = curl_multi_remove_handle (p_handle->p_context,
+                                       p_req->p_context);
+    if (m_code != CURLM_OK)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
+        HTTP_HANDLE_INTERNAL_ERROR (p_handle, m_code);
         e_code = E_FAILURE;
     }
 
@@ -852,7 +871,7 @@ remove_http_handle (pst_http_handle_t  p_handle,
 
 
 /* **************************************************************************
- *	@brief      perform_http_handle_simple
+ *	@brief      perform_http_handle
  *	@version
  *  @ingroup
  *  @date
@@ -861,11 +880,12 @@ remove_http_handle (pst_http_handle_t  p_handle,
  *  @retval     E_SUCCESS/E_FAILURE
  * **************************************************************************/
 
-e_http_error_code_t
-perform_http_handle_simple (pst_http_handle_t  p_handle,
-                            pst_http_request_t  p_req)
+e_error_code_t
+perform_http_handle (pst_http_handle_t  p_handle,
+                     pst_http_request_t  p_req)
 {
-    e_http_error_code_t e_code = E_SUCCESS;
+    e_error_code_t      e_code = E_SUCCESS;
+    CURLMcode           m_code = CURLM_OK;
     int                 now_running;
     struct timeval      timeout;
     int                 rc;   /* select() return code */
@@ -882,14 +902,10 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
     timeout.tv_usec = 0;
 
 
-    if (p_req != NULL)
+    if (p_req == NULL)
     {
-        try_exception ((*p_handle->pf_add)(p_handle, p_req) != E_SUCCESS,
-                       exception_multi_add_handle);
-
-        now_running = p_handle->still_running + 1;
-        try_exception ((p_handle->err_code
-                        = curl_multi_perform(p_handle->p_context,
+        now_running = p_handle->still_running;
+        try_exception ((m_code = curl_multi_perform(p_handle->p_context,
                                              &p_handle->still_running))
                         != CURLM_OK,
                         exception_curl_multi_perform);
@@ -897,6 +913,13 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
         {
             (void) process_http_rsp_done (p_handle);
         }
+
+        return (E_SUCCESS);
+    }
+    else
+    {
+        try_exception ((p_handle->pf_add)(p_handle, p_req) != E_SUCCESS,
+                       exception_multi_add_handle);
     }
 
 
@@ -918,7 +941,7 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
     }
 
     /* get file descriptors from the transfers */
-    try_exception ((p_handle->err_code
+    try_exception ((m_code
                     = curl_multi_fdset (p_handle->p_context,
                                         &fdread,
                                         &fdwrite, &fdexcep, &maxfd))
@@ -929,12 +952,11 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
     if (rc >= 0)
     {
         now_running = p_handle->still_running;
-        try_exception ((p_handle->err_code
+        try_exception ((m_code
                         = curl_multi_perform(p_handle->p_context,
                                              &p_handle->still_running))
                         != CURLM_OK,
                         exception_curl_multi_perform);
-
         if (p_handle->still_running < now_running)
         {
             (void) process_http_rsp_done (p_handle);
@@ -944,28 +966,23 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
 
     try_catch (exception_multi_add_handle)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
+        HTTP_HANDLE_INTERNAL_ERROR (p_handle, m_code);
         e_code = E_FAILURE;
     }
     try_catch (exception_curl_multi_fdset)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
+        HTTP_HANDLE_INTERNAL_ERROR (p_handle, m_code);
         e_code = E_FAILURE;
     }
     try_catch (exception_curl_multi_perform)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
+        HTTP_HANDLE_INTERNAL_ERROR (p_handle, m_code);
         try_assert (p_handle->err_code == CURLM_INTERNAL_ERROR);
         e_code = E_FAILURE;
     }
     try_finally;
 
-    /*
-    (void) process_http_rsp_done (p_handle);
-    */
+    p_handle->last_tick = time (NULL);
 
     return (e_code);
 }
@@ -974,7 +991,7 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
 
 
 /* **************************************************************************
- *	@brief      setopt_http_handle_simple
+ *	@brief      setopt_http_handle
  *	@version
  *  @ingroup
  *  @date
@@ -984,60 +1001,33 @@ perform_http_handle_simple (pst_http_handle_t  p_handle,
  * **************************************************************************/
 
 static
-e_http_error_code_t
-setopt_http_handle_simple (pst_http_handle_t  p_handle)
+e_error_code_t
+setopt_http_handle (pst_http_handle_t  p_handle)
 {
-    e_http_error_code_t e_code = E_SUCCESS;
+    CURLMcode       m_code = CURLM_OK;
 
 
     /*  1. PIPELINING OPTION (HTTP1.1, HTTP/2.0)    */
-    try_exception ((p_handle->err_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_PIPELINING,
-                                         CURLPIPE_HTTP1 | CURLPIPE_MULTIPLEX))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
+    if ((m_code = curl_multi_setopt (p_handle->p_context,
+                                     CURLMOPT_PIPELINING,
+                                     CURLPIPE_HTTP1 | CURLPIPE_MULTIPLEX))
+            != CURLM_OK)
+    {
+        HTTP_HANDLE_INTERNAL_ERROR(p_handle, m_code);
+        return (E_FAILURE);
+    }
 
     /*  2. set curl multi-handle option */
-    try_exception ((p_handle->err_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_MAX_HOST_CONNECTIONS,
-                                         p_handle->connections.max_host))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
-
-
-    try_catch (exception_curl_multi_setopt)
+    if ((m_code = curl_multi_setopt (p_handle->p_context,
+                                     CURLMOPT_MAX_HOST_CONNECTIONS,
+                                     p_handle->connections.max_host))
+            != CURLM_OK)
     {
-        strcpy (p_handle->err_string,
-                curl_multi_strerror (p_handle->err_code));
-        e_code = E_FAILURE;
+        HTTP_HANDLE_INTERNAL_ERROR(p_handle, m_code);
+        return (E_FAILURE);
     }
-    try_finally;
 
-    return (e_code);
-}
-
-
-
-
-/* **************************************************************************
- *	@brief      perform_http_handle
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param
- *  @retval     SUCC(0)
- * **************************************************************************/
-
-e_http_error_code_t
-perform_http_handle (pst_http_handle_t  p_handle,
-                     pst_http_request_t  p_req)
-{
-    p_handle->last_tick = time (NULL);
-
-    return ((*p_handle->pf_perform)(p_handle, p_req));
+    return (E_SUCCESS);
 }
 
 
@@ -1232,7 +1222,6 @@ static
 e_error_code_t
 pre_alloc_easy_handle (void *p_mem, void *p_arg)
 {
-    int                 user_size = 0;
     pst_http_request_t  p_tmp = (pst_http_request_t)p_mem;
 
 
@@ -1242,6 +1231,8 @@ pre_alloc_easy_handle (void *p_mem, void *p_arg)
         return (E_FAILURE);
     p_tmp->p_multi = (pst_http_handle_t)p_arg;
 
+
+    p_tmp->pf_reset = reset_http_request;
 
     /*  set easy handle default option          */
     if (setopt_http_request_default(p_tmp) != E_SUCCESS)
@@ -1264,12 +1255,14 @@ pre_alloc_easy_handle (void *p_mem, void *p_arg)
      * ISSUE : remove Application Dependency"
      *  application pending information buffer
      * ----------------------------------------------------------- */
-    user_size = MEMORY_ALIGNED(offsetof (st_eigw_request_t, body.data) + 256,4);
-    p_tmp->p_user2 = MALLOC (user_size);
+#ifdef _PRE_AOOLOC_USER2
+    p_tmp->p_user2 = MALLOC (MEMORY_ALIGNED(offsetof (st_eigw_request_t,
+                                                      body.data) + 256,4));
     if (p_tmp->p_user2 == NULL)
     {
         return (E_FAILURE);
     }
+#endif
 
     return (E_SUCCESS);
 }
@@ -1291,7 +1284,6 @@ e_http_error_code_t
 init_http_handle (pst_http_handle_t                *pp_handle,
                   char                             *p_fname,
                   char                             *p_section,
-                  e_http_handle_mode_t              mode,
                   e_http_error_code_t (*pf_option) (pst_http_handle_t))
 {
     e_error_code_t      e_code   = E_SUCCESS;
@@ -1304,7 +1296,6 @@ init_http_handle (pst_http_handle_t                *pp_handle,
                    == NULL,
                    exception_alloc_handle);
     memset (p_handle, 0x00, sizeof (*p_handle));
-    p_handle->mode      = mode;
     p_handle->last_tick = time (NULL);
 
     /*  2. alloc http context   */
@@ -1328,16 +1319,8 @@ init_http_handle (pst_http_handle_t                *pp_handle,
     }
 
     /*  4. register handle function */
-    p_handle->pf_set     = setopt_http_handle_simple;
-    p_handle->pf_perform = perform_http_handle_simple;
-#ifdef _UV_LIB_SUPPORT
-    if (p_handle->mode == HTTP_SOCKET_MODE)
-    {
-        p_handle->pf_set     = setopt_http_handle_socket;
-        p_handle->pf_perform = perform_http_handle_socket;
-    }
-#endif
-
+    p_handle->pf_set     = setopt_http_handle;
+    p_handle->pf_perform = perform_http_handle;
     if (pf_option != NULL)
     {
         /*  overloading default option  */
@@ -1425,307 +1408,3 @@ destory_http_handle (pst_http_handle_t    p_handle)
 
     return (E_SUCCESS);
 }
-
-
-
-
-#ifdef _UV_LIB_SUPPORT
-
-/* **************************************************************************
- *	@brief      perform_http_handle_socket
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param
- *  @retval     E_SUCCESS/E_FAILURE
- * **************************************************************************/
-
-static
-void
-perform_http_handle_socket (uv_poll_t *p_req,
-                            int        status,
-                            int        events)
-{
-    int                 running_handles = 0;
-    int                 flags           = 0;
-    pst_http_context_t  p_context       = NULL;
-
-
-    UNUSED (status);
-
-    if(events & UV_READABLE) flags |= CURL_CSELECT_IN;
-    if(events & UV_WRITABLE) flags |= CURL_CSELECT_OUT;
-
-    p_context = (pst_http_context_t) p_req->data;
-
-    curl_multi_socket_action (p_context->p_handle->p_context,
-                              p_context->sockfd, flags,
-                              &running_handles);
-
-
-    (void) process_http_rsp_done (p_context->p_handle);
-
-    return;
-}
-
-
-
-
-/* **************************************************************************
- *	@brief      on_timeout
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param      [IN] req  - uv timer object
- *  @retval     none
- * **************************************************************************/
-
-static
-void
-on_timeout (uv_timer_t *req)
-{
-    int running_handles;
-
-
-    UNUSED (req);
-    /*  NOTICE !!
-    curl_multi_socket_action (curl_handle, */
-
-    curl_multi_socket_action (NULL,
-                              CURL_SOCKET_TIMEOUT,
-                              0,
-                              &running_handles);
-    /*
-    process_http_rsp_done ();
-    */
-    return;
-}
-
-
-
-/* **************************************************************************
- *	@brief      start_timeout
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param      [IN] multi      - multi handle
- *              [IN] timeout_ms
- *              [IN] userp      - private callback pointer
- *  @retval     none
- * **************************************************************************/
-static
-int
-start_timeout (CURLM    *multi,
-               long     timeout_ms,
-               void     *userp)
-{
-    pst_http_handle_t   p_handle = (pst_http_handle_t) userp;
-
-    UNUSED (multi);
-    if (timeout_ms < 0)
-    {
-        uv_timer_stop(&p_handle->timer);
-    }
-    else
-    {
-        if(timeout_ms == 0)
-        {
-            /* 0 means directly call socket_action, but we'll do it in a bit */
-            timeout_ms = 1;
-        }
-        uv_timer_start(&p_handle->timer, on_timeout, timeout_ms, 0);
-    }
-
-    return 0;
-}
-
-
-
-/* **************************************************************************
- *	@brief      init_curl_context
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param
- *  @retval     none
- * **************************************************************************/
-static
-pst_http_context_t
-init_curl_context (pst_http_handle_t  p_handle,
-                   curl_socket_t      sockfd)
-{
-    pst_http_context_t  p_context = NULL;
-
-    p_context = (pst_http_context_t) MALLOC (sizeof *p_context);
-    p_context->p_handle = p_handle;
-    p_context->sockfd   = sockfd;
-
-    uv_poll_init_socket (p_handle->p_loop, &p_context->poll_handle, sockfd);
-    p_context->poll_handle.data = p_context;
-
-    return p_context;
-}
-
-static
-void
-curl_close_cb (uv_handle_t  *p_handle)
-{
-    pst_http_context_t  p_context = (pst_http_context_t)p_handle->data;
-
-    FREE (p_context);
-}
-
-
-static
-void
-destroy_curl_context (pst_http_context_t    p_context)
-{
-    uv_close ((uv_handle_t *) &p_context->poll_handle, curl_close_cb);
-    return;
-}
-
-/* **************************************************************************
- *	@brief      handle_socket
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param      [IN]    easy handle
- *              [IN]    socket
- *              [IN]    describes the socket
- *              [IN]    private callback pointer
- *              [IN]    private socket pointer
- *  @retval     none
- * **************************************************************************/
-
-static
-int
-handle_socket (CURL           *easy,
-               curl_socket_t  s,
-               int            action,
-               void           *userp,
-               void           *socketp)
-{
-    pst_http_handle_t   p_handle       = (pst_http_handle_t)userp;
-    pst_http_context_t  p_curl_context = NULL;
-    int                 events = 0;
-
-    UNUSED (easy);
-
-    switch(action)
-    {
-        case CURL_POLL_IN:
-        case CURL_POLL_OUT:
-        case CURL_POLL_INOUT:
-            p_curl_context = socketp ?
-                            (pst_http_context_t) socketp
-                            : init_curl_context (p_handle, s);
-
-            curl_multi_assign (p_handle->p_context,
-                               s,
-                               (void *) p_curl_context);
-
-            if (action != CURL_POLL_IN)  events |= UV_WRITABLE;
-            if (action != CURL_POLL_OUT) events |= UV_READABLE;
-
-            uv_poll_start (&p_curl_context->poll_handle,
-                            events,
-                            perform_http_handle_socket);
-            break;
-
-        case CURL_POLL_REMOVE:
-            if (socketp != NULL)
-            {
-                uv_poll_stop (&((pst_http_context_t)socketp)->poll_handle);
-                destroy_curl_context((pst_http_context_t) socketp);
-                curl_multi_assign(p_handle->p_context, s, NULL);
-            }
-            break;
-        default:
-            abort();
-    }
-
-    return (0);
-}
-
-
-
-
-/* **************************************************************************
- *	@brief      setopt_http_multi_handle_socket
- *	@version
- *  @ingroup
- *  @date
- *  @author
- *  @param
- *  @retval     SUCC(0)
- * **************************************************************************/
-
-static
-e_http_error_code_t
-setopt_http_handle_socket (pst_http_handle_t  p_handle)
-{
-    e_http_error_code_t e_code = E_SUCCESS;
-    CURLMcode      curl_e_code = CURLM_OK;
-
-
-    /*  1. PIPELINING OPTION (HTTP1.1, HTTP/2.0)    */
-    try_exception ((curl_e_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_PIPELINING,
-                                         CURLPIPE_HTTP1 | CURLPIPE_MULTIPLEX))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
-
-    /*  2. set curl multi-handle option */
-    try_exception ((curl_e_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_MAX_HOST_CONNECTIONS,
-                                         (long) p_handle->connections.max_host))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
-
-    /*  3. set curl socket function     */
-    try_exception ((curl_e_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_SOCKETFUNCTION,
-                                         handle_socket))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
-    try_exception ((curl_e_code = curl_multi_setopt (p_handle->p_context,
-                                                     CURLMOPT_SOCKETDATA,
-                                                     (void *)p_handle))
-                   != CURLM_OK,
-                   exception_curl_multi_setopt);
-
-    /*  4. set curl timer function     */
-    try_exception ((curl_e_code
-                    = curl_multi_setopt (p_handle->p_context,
-                                         CURLMOPT_TIMERFUNCTION,
-                                         start_timeout))
-                    != CURLM_OK,
-                    exception_curl_multi_setopt);
-    try_exception ((curl_e_code = curl_multi_setopt (p_handle->p_context,
-                                                     CURLMOPT_TIMERDATA,
-                                                     (void *)p_handle))
-                   != CURLM_OK,
-                   exception_curl_multi_setopt);
-    p_handle->err_code = curl_e_code;
-
-
-    try_catch (exception_curl_multi_setopt)
-    {
-        p_handle->err_code = curl_e_code;
-        HTTP_LOG ("fail, %s\n", curl_multi_strerror (curl_e_code));
-        e_code = E_FAILURE;
-    }
-    try_finally;
-
-    return (e_code);
-}
-#endif
-

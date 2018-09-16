@@ -556,21 +556,14 @@ recv_socket_handle (pst_socket_handle_t    p_sock,
         }
         else
         {
-            fcntl (sfd, F_SETFL, flag);
-
-            p_sock->err_no = errno;
-            strcpy (p_sock->err_string, strerror(errno));
+            SOCKET_HANDLE_INTERNAL_ERROR (p_sock, errno, strerror(errno));
             (*p_sock->pf_close)(p_sock);
             e_code      = E_SOCK_DISCONNECT;
         }
     }
     try_catch (exception_socket_recv)
     {
-        /*  restore socket  option */
-        fcntl (sfd, F_SETFL, flag);
-
-        p_sock->err_no = errno;
-        strcpy (p_sock->err_string, strerror(errno));
+        SOCKET_HANDLE_INTERNAL_ERROR (p_sock, errno, strerror(errno));
         (*p_sock->pf_close)(p_sock);
         e_code      = E_SOCK_DISCONNECT;
     }
@@ -645,16 +638,13 @@ send_socket_handle (pst_socket_handle_t    p_sock,
         e_code = E_FAILURE;
         if ((errno == EPIPE) || (errno == ECONNRESET) || (send_length == 0))
         {
-            p_sock->err_no = errno;
-            strcpy (p_sock->err_string, strerror(errno));
-
+            SOCKET_HANDLE_INTERNAL_ERROR (p_sock, errno, strerror(errno));
             (*p_sock->pf_close)(p_sock);
             e_code = E_SOCK_DISCONNECT;
         }
         else
         {
-            Log (DEBUG_ERROR,
-                    "fail, send socket (%d, %s)\n", errno, strerror(errno));
+            SOCKET_HANDLE_INTERNAL_ERROR (p_sock, errno, strerror(errno));
         }
     }
     try_finally;
@@ -713,29 +703,23 @@ connect_socket_handle (pst_socket_handle_t    p_handle)
 
     try_catch (exception_addrinfo_socket)
     {
-        p_handle->err_no = ret;
-        strcpy (p_handle->err_string, gai_strerror(p_handle->err_no));
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         e_code = E_FAILURE;
     }
     try_catch (exception_create_socket)
     {
-        p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(p_handle->err_no));
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         e_code = E_FAILURE;
     }
     try_catch (exception_option_socket)
     {
-        p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(errno));
-
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         (*p_handle->pf_close)(p_handle);
         e_code = E_FAILURE;
     }
     try_catch (exception_connect_socket)
     {
-        p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(errno));
-
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         (*p_handle->pf_close)(p_handle);
         e_code = E_FAILURE;
     }
@@ -791,22 +775,14 @@ listen_socket_handle (pst_socket_handle_t   p_handle)
 
 
     try_catch (exception_addrinfo_socket)
-    {
-        p_handle->err_no = ret;
-        strcpy (p_handle->err_string, gai_strerror(p_handle->err_no));
-        e_code = E_FAILURE;
-    }
     try_catch_through (exception_create_socket)
     {
-        p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(errno));
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         e_code = E_FAILURE;
     }
     try_catch (exception_listen_socket)
     {
-        p_handle->err_no = errno;
-        strcpy (p_handle->err_string, strerror(errno));
-
+        SOCKET_HANDLE_INTERNAL_ERROR (p_handle, errno, strerror(errno));
         (*p_handle->pf_close)(p_handle);
         e_code = E_FAILURE;
     }
@@ -909,8 +885,7 @@ accept_socket_handle (pst_socket_handle_t    p_local,
     }
     try_catch (exception_accept_call)
     {
-        p_local->err_no = errno;
-        strcpy (p_local->err_string, strerror(errno));
+        SOCKET_HANDLE_INTERNAL_ERROR (p_local, errno, strerror(errno));
         e_code = E_FAILURE;
     }
     try_catch (exception_alloc_handle)

@@ -297,10 +297,6 @@ read_stream_handle (pst_stream_handle_t     p_handle,
 
     try_catch (exception_already_recevied_bytes)
     {
-        Log (DEBUG_LOW,
-                "info, recv bytes from stream buffer   (%d)\n",
-                (*p_rbytes));
-
         (*pp_ptr)  = p_handle->p_buf[p_handle->active_bucket]
                                              + p_handle->last_location;
         p_handle->last_location += *p_rbytes;

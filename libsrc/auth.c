@@ -27,10 +27,10 @@ extract_token_from_json (pst_http_auth_token_t  p_token,
                          char                   *p_json)
 {
     e_error_code_t  e_code = E_SUCCESS;
+    JsonDocument    Auth;
 
     if (p_json && *p_json != 0x00)
     {
-        JsonDocument    Auth;
         Auth.Parse (p_json);
 
         strcpy (p_token->access_token,
@@ -62,11 +62,10 @@ extract_token_from_json (pst_http_auth_token_t  p_token,
  * **************************************************************************/
 static
 e_error_code_t
-set_auth_postfield (pst_auth_handle_t p_handle,
-                    char              *p_postfield)
+set_auth_postfield (pst_auth_handle_t   p_handle)
 {
     e_error_code_t      e_code = E_SUCCESS;
-    e_http_auth_grant_t type = p_handle->grant_type;
+    e_http_auth_grant_t type = p_handle->parameter.grant_type;
 
     if (type == ENUM_OAUTH_GRANT_PASSWD)
     {
@@ -79,24 +78,39 @@ set_auth_postfield (pst_auth_handle_t p_handle,
     switch (type)
     {
         case ENUM_OAUTH_GRANT_CREDENTIALS :
-            sprintf (p_postfield,
-                "grant_type=client_credentials&client_id=%s&client_secret=%s",
-                p_handle->client_id,
-                p_handle->client_secret);
+            if (p_handle->parameter.post_type == ENUM_OAUTH_POST_HEADER)
+            {
+                sprintf (p_handle->parameter.post_field,
+                    "grant_type=client_credentials&client_id=%s&client_secret=%s",
+                    p_handle->parameter.client_id,
+                    p_handle->parameter.client_secret);
+            }
+            else
+            {
+                sprintf (p_handle->parameter.post_field,
+                            "{ "
+                            "  \"clientId\"     : \"%s\","
+                            "  \"clientSecret\" : \"%s\","
+                            "  \"grantType\"    : \"client_credentials\""
+                            "}",
+                            p_handle->parameter.client_id,
+                            p_handle->parameter.client_secret);
+
+            }
             break;
         case ENUM_OAUTH_GRANT_PASSWD:
-            sprintf (p_postfield,
+            sprintf (p_handle->parameter.post_field,
                 "grant_type=password&client_id=%s&client_secret=%s&username=%s&password=%s",
-                p_handle->client_id,
-                p_handle->client_secret,
-                p_handle->username,
-                p_handle->passwd);
+                p_handle->parameter.client_id,
+                p_handle->parameter.client_secret,
+                p_handle->parameter.username,
+                p_handle->parameter.passwd);
             break;
         case ENUM_OAUTH_GRANT_REFRESH:
-            sprintf (p_postfield,
+            sprintf (p_handle->parameter.post_field,
                 "grant_type=refresh_token&client_id=%s&client_secret=%s&refresh_token=%s",
-                p_handle->client_id,
-                p_handle->client_secret,
+                p_handle->parameter.client_id,
+                p_handle->parameter.client_secret,
                 p_handle->token.refresh_token);
             break;
         default:
@@ -143,20 +157,29 @@ clean_auth_handle (pst_auth_handle_t  p_handle)
  * **************************************************************************/
 static
 e_error_code_t
-verify_auth_handle (pst_auth_handle_t  p_handle)
+verify_auth_handle (pst_auth_handle_t    p_handle,
+                    char                *p_domain)
 {
     e_error_code_t  e_code = E_SUCCESS;
+
 
     if (p_handle->is_used != BOOL_TRUE)
     {
         return (E_SUCCESS);
     }
 
+    /*  1. verify auth token        */
     if (((p_handle->token.expires_tick - time(NULL))
                 < p_handle->verification_tick)
             || (p_handle->auth_header[0] == 0x00))
     {
         e_code = E_FAILURE;
+    }
+
+    /*  2. verify destination domain */
+    if ((p_handle->domain[0] != 0x00) && p_domain)
+    {
+        if (strcmp (p_domain, p_handle->domain) != 0) e_code = E_FAILURE;
     }
 
     return (e_code);
@@ -324,11 +347,32 @@ setopt_auth_request (pst_auth_handle_t    p_auth,
     /* --------------------------------------------------------------------
      *  URI option
      * -------------------------------------------------------------------  */
-    (void) set_auth_postfield (p_auth, post_field);
-    sprintf (uri, "%s?%s",p_req->uri, post_field);
-    p_req->err_code = curl_easy_setopt (p_handle,
-                                        CURLOPT_URL,
-                                        uri);
+    (void) set_auth_postfield (p_auth);
+    if (p_auth->parameter.post_type == ENUM_OAUTH_POST_HEADER)
+    {
+        sprintf (uri, "%s?%s",p_req->uri, post_field);
+        p_req->err_code = curl_easy_setopt (p_handle,
+                                            CURLOPT_URL,
+                                            uri);
+    }
+    else
+    {
+        p_req->err_code = curl_easy_setopt (p_handle,
+                                            CURLOPT_URL,
+                                            p_req->uri);
+
+        /* ---------------------------------------------------------------
+         * NOTICE: POST_FIELD
+         * The data pointed to is NOT copied by the library: as a consequence,
+         * it must be preserved by the calling application
+         * until the associated transfer finishes
+         * --------------------------------------------------------------- */
+        p_req->err_code = curl_easy_setopt (p_handle,
+                                            CURLOPT_POSTFIELDS,
+                                            p_auth->parameter.post_field);
+        try_exception (p_req->err_code != CURLE_OK,
+                                exception_setopt_http_request);
+    }
     try_exception (p_req->err_code != CURLE_OK,
                         exception_setopt_http_request);
 
@@ -343,9 +387,16 @@ setopt_auth_request (pst_auth_handle_t    p_auth,
     try_exception (p_req->err_code != CURLE_OK,
                     exception_setopt_http_request);
 
+
     /* --------------------------------------------------------------------
      *  HEADER option
      * -------------------------------------------------------------------  */
+    if (p_auth->parameter.post_type == ENUM_OAUTH_POST_BODY)
+    {
+        p_req->p_header
+            = curl_slist_append (p_req->p_header,
+                                 p_auth->parameter.content_type);
+    }
     p_req->p_header
         = curl_slist_append (p_req->p_header,
                              p_auth->accept_type);
@@ -359,17 +410,10 @@ setopt_auth_request (pst_auth_handle_t    p_auth,
 
     p_req->err_code = curl_easy_setopt (p_handle,
                                         CURLOPT_USERAGENT,
-               ((pst_http_handle_t)(p_req->p_multi))->header.agent_name);
+               (HTTP_HANDLE_FROM_REQUEST(p_req))->header.agent_name);
     try_exception (p_req->err_code != CURLE_OK,
                             exception_setopt_http_request);
 
-
-    /*
-    try_exception (curl_easy_setopt (p_handle,
-                                     CURLOPT_POSTFIELDS, post_field)
-                   != CURLE_OK,
-                   exception_setopt_http_request);
-                   */
 
     try_catch (exception_setopt_http_request)
     {
@@ -409,12 +453,17 @@ recv_auth_handle (pst_http_request_t p_http)
     pst_auth_handle_t   p_handle = NULL;
 
 
-    Log (DEBUG_INFO, "info, [HEADER ] %s\n", p_http->rsp.p_header->p_mem);
-    Log (DEBUG_INFO, "info, [BODY   ] %s\n", p_http->rsp.p_body->p_mem);
+    Log (DEBUG_INFO, "info, [HEADER ] %s\n", MCHUNK_MEM (p_http->rsp.p_header));
+    Log (DEBUG_INFO, "info, [BODY   ] %s\n", MCHUNK_MEM (p_http->rsp.p_body));
 
-    p_handle = (pst_auth_handle_t) p_http->p_user1;
     if (p_http->rsp.status_code != HTTP_RESULT_OK)
     {
+        if (p_http->err_string [0] != 0x00)
+        {
+            Log (DEBUG_ERROR,
+                    "fail, authorizaiton token request (%s)\n",
+                    p_http->err_string);
+        }
         Log (DEBUG_ERROR,
                 "fail, authorizaiton token request (%d, %s)\n",
                 p_http->rsp.status_code,
@@ -424,6 +473,7 @@ recv_auth_handle (pst_http_request_t p_http)
     }
     else
     {
+        p_handle = (pst_auth_handle_t) p_http->p_user1;
         e_code = save_auth_handle (p_handle,
                                    p_http->rsp.p_body->p_mem);
         p_handle->token.expires_tick = time (NULL) + p_handle->token.expires_in;
@@ -491,7 +541,7 @@ send_auth_handle (pst_auth_handle_t p_handle,
     }
 
     /*  send http request               */
-    e_code = perform_http_handle (p_http, p_uri);
+    e_code = (p_http->pf_perform)(p_http, p_uri);
     if (e_code != E_SUCCESS)
     {
         Log (DEBUG_ERROR,
@@ -502,11 +552,9 @@ send_auth_handle (pst_auth_handle_t p_handle,
     }
 
 
-
     while (p_http->still_running)
     {
-        (void) (*p_http->pf_perform)(p_http, NULL);
-        usleep (100);
+        e_code = (p_http->pf_perform)(p_http, NULL);
     }
 
     return (e_code);
@@ -539,43 +587,127 @@ show_auth_handle (pst_auth_handle_t p_handle,
             p_name,
             p_handle->is_used == BOOL_TRUE ? "TRUE" : "FALSE");
     Log (DEBUG_CRITICAL,
+            "succ, loading %-8s property [auth dest domain     : %s]\n",
+            p_name,
+            p_handle->domain[0] == 0x00 ? "ALL" : p_handle->domain);
+    Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth URI             : %s]\n",
             p_name,
             p_handle->uri);
-    Log (DEBUG_CRITICAL,
-            "succ, loading %-8s property [auth content type    : %s]\n",
-            p_name,
-            p_handle->content_type);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth accept type     : %s]\n",
             p_name,
             p_handle->accept_type);
     Log (DEBUG_CRITICAL,
+            "succ, loading %-8s property [auth post  type      : %s]\n",
+            p_name,
+            p_handle->parameter.post_type == ENUM_OAUTH_POST_HEADER ?
+            "HEADER" : "BODY");
+    Log (DEBUG_CRITICAL,
+            "succ, loading %-8s property [auth content type    : %s]\n",
+            p_name,
+            p_handle->parameter.content_type);
+    Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth grant type      : %d]\n",
             p_name,
-            p_handle->grant_type);
+            p_handle->parameter.grant_type);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth client id       : %s]\n",
             p_name,
-            p_handle->client_id);
+            p_handle->parameter.client_id);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth client secret   : %s]\n",
             p_name,
-            p_handle->client_secret);
+            p_handle->parameter.client_secret);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth user name       : %s]\n",
             p_name,
-            p_handle->username);
+            p_handle->parameter.username);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [auth user passwd     : %s]\n",
             p_name,
-            p_handle->passwd);
+            p_handle->parameter.passwd);
     Log (DEBUG_CRITICAL,
             "succ, loading %-8s property [token file name      : %s]\n",
             p_name,
             p_handle->tfname);
 
     return;
+}
+
+
+
+/* **************************************************************************
+ *  @brief          set http authorizaion parameter
+ *  @version
+ *  @ingroup
+ *  @date
+ *  @author
+ *  @retval         E_SUCCESS/else
+ * **************************************************************************/
+static
+e_error_code_t
+set_parameter_auth_handle (pst_auth_handle_t p_handle)
+{
+    e_error_code_t  e_code = E_SUCCESS;
+    char            buf  [DEFAULT_STRING_BUF_LEN] = {0,};
+
+
+    memset (buf, 0x00, sizeof (buf));
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_POST_FIELD,
+                        OAUTH_CONFIG_POST_DEFAULT, buf);
+    p_handle->parameter.post_type = (e_http_auth_post_t) atoi (buf);
+
+
+    /* --------------------------------------------------------------------
+     * GRAND TYPE
+     * -------------------------------------------------------------------- */
+    memset (buf, 0x00, sizeof (buf));
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_GRANT_FIELD,
+                        OAUTH_CONFIG_GRANT_DEFAULT, buf);
+    p_handle->parameter.grant_type = (e_http_auth_grant_t) atoi (buf);
+
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_CLIENT_ID_FIELD,
+                        NULL,
+                        p_handle->parameter.client_id);
+
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_CLIENT_SECRET_FIELD,
+                        NULL,
+                        p_handle->parameter.client_secret);
+
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_USERNAME_FIELD,
+                        NULL,
+                        p_handle->parameter.username);
+
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_PASSWD_FIELD,
+                        NULL,
+                        p_handle->parameter.passwd);
+
+    /* --------------------------------------------------------------------
+     * default header option (content_type)
+     * -------------------------------------------------------------------- */
+    memset (buf, 0x00, sizeof (buf));
+    (void) ReadConfFile (p_handle->cfname,
+                        p_handle->csection,
+                        OAUTH_CONFIG_HEADER_CONTENT_TYPE_FIELD,
+                        OAUTH_CONFIG_HEADER_CONTENT_TYPE_DEFAULT,
+                        buf);
+    sprintf (p_handle->parameter.content_type, "Content-Type: %s",buf);
+
+
+    return (e_code);
 }
 
 
@@ -641,9 +773,8 @@ set_auth_handle (pst_auth_handle_t p_handle)
                         buf);
     p_handle->verification_tick = atoi (buf);
 
-
     /* --------------------------------------------------------------------
-     * destination domain
+     * destination URI
      * -------------------------------------------------------------------- */
     (void) ReadConfFile (p_handle->cfname,
                         p_handle->csection,
@@ -658,18 +789,6 @@ set_auth_handle (pst_auth_handle_t p_handle)
                         OAUTH_CONFIG_PROTOCOL_VERSION_DEFAULT,
                         buf);
     p_handle->hversion = atoi (buf);
-
-
-    /* --------------------------------------------------------------------
-     * GRAND TYPE
-     * -------------------------------------------------------------------- */
-    memset (buf, 0x00, sizeof (buf));
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_GRANT_FIELD,
-                        OAUTH_CONFIG_GRANT_DEFAULT, buf);
-    p_handle->grant_type = (e_http_auth_grant_t) atoi (buf);
-
 
     /* --------------------------------------------------------------------
      * required domain
@@ -688,46 +807,10 @@ set_auth_handle (pst_auth_handle_t p_handle)
                         OAUTH_CONFIG_HEADER_ACCEPT_TYPE_FIELD,
                         OAUTH_CONFIG_HEADER_ACCEPT_TYPE_DEFAULT,
                         buf);
-    sprintf (p_handle->accept_type, "Accept:%s",buf);
+    sprintf (p_handle->accept_type, "Accept: %s",buf);
 
-    /* --------------------------------------------------------------------
-     * default header option (content_type)
-     * -------------------------------------------------------------------- */
-    memset (buf, 0x00, sizeof (buf));
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_HEADER_CONTENT_TYPE_FIELD,
-                        OAUTH_CONFIG_HEADER_CONTENT_TYPE_DEFAULT,
-                        buf);
-    sprintf (p_handle->content_type, "Content-Type:%s",buf);
 
-    /* --------------------------------------------------------------------
-     * default header option (content_type)
-     * -------------------------------------------------------------------- */
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_CLIENT_ID_FIELD,
-                        NULL,
-                        p_handle->client_id);
-
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_CLIENT_SECRET_FIELD,
-                        NULL,
-                        p_handle->client_secret);
-
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_USERNAME_FIELD,
-                        NULL,
-                        p_handle->username);
-
-    (void) ReadConfFile (p_handle->cfname,
-                        p_handle->csection,
-                        OAUTH_CONFIG_PASSWD_FIELD,
-                        NULL,
-                        p_handle->passwd);
-
+    (void) set_parameter_auth_handle (p_handle);
 
     try_catch (exception_not_found_file)
     {

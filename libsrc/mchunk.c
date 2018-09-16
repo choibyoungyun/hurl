@@ -17,6 +17,31 @@
 
 
 /* **************************************************************************
+ *	@brief      init memory chunk (not free)
+ *	@version
+ *  @ingroup
+ *  @date
+ *  @author
+ *  @param
+ *  @retval     int
+ * **************************************************************************/
+static
+e_error_code_t
+reset_mchunk_handle (pst_mchunk_handle_t    p_handle)
+{
+    p_handle->now_size = 0;
+    if (p_handle->p_mem)
+    {
+        *(p_handle->p_mem) = 0x00;
+    }
+
+    return (E_SUCCESS);
+}
+
+
+
+
+/* **************************************************************************
  *	@brief      add_mchunk_handle
  *	@version
  *  @ingroup
@@ -33,6 +58,7 @@ add_mchunk_handle (pst_mchunk_handle_t p_mchunk,
                    int                add_size)
 {
     int     new_length = 0;
+    char    *p_old;
 
 
     if (p_mchunk->max_size < (p_mchunk->now_size + add_size + 1))
@@ -40,9 +66,11 @@ add_mchunk_handle (pst_mchunk_handle_t p_mchunk,
         new_length = MEMORY_ALIGNED (p_mchunk->now_size + add_size + 1,
                                     p_mchunk->block_size);
 
+        p_old = p_mchunk->p_mem;
         p_mchunk->p_mem = (char *) REALLOC (p_mchunk->p_mem, new_length);
         if (p_mchunk->p_mem == NULL)
         {
+            p_mchunk->p_mem = p_old;
             return (E_ALLOC_HANDLE);
         }
         p_mchunk->max_size = new_length;
@@ -100,7 +128,8 @@ init_mchunk_handle (pst_mchunk_handle_t  *pp_handle,
         FREE (p_handle);
         return (E_ALLOC_HANDLE);
     }
-    p_handle->pf_add = add_mchunk_handle;
+    p_handle->pf_add   = add_mchunk_handle;
+    p_handle->pf_reset = reset_mchunk_handle;
 
     (*pp_handle) = p_handle;
 

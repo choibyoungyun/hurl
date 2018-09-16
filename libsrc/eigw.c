@@ -67,14 +67,14 @@ show_eigw_handle (pst_eigw_handle_t  p_handle,
             p_handle->p_rbuf->bucket_size);
 
 
-    (*p_handle->p_sock->pf_show)(p_handle->p_sock, p_name);
+    (p_handle->p_sock->pf_show)(p_handle->p_sock, p_name);
 
     return;
 }
 
 
 
-
+#ifdef _USED_EIGW_PENDING_QUEUE
 /* **************************************************************************
  *	@brief      alloc pending queue
  *	@version
@@ -90,8 +90,8 @@ alloc_pending_queue_eigw_handle (pst_eigw_handle_t    p_handle,
                                  pst_eigw_request_t   *pp_req)
 {
     if (p_handle->p_pending_queue)
-        return ((*p_handle->p_pending_queue->pf_alloc)(p_handle->p_pending_queue,
-                                                       (void **)pp_req));
+        return ((p_handle->p_pending_queue->pf_alloc)(p_handle->p_pending_queue,
+                                                      (void **)pp_req));
     return (E_SUCCESS);
 }
 
@@ -119,12 +119,13 @@ free_pending_queue_eigw_handle (pst_eigw_handle_t    p_handle,
     if (p_handle->p_pending_queue)
     {
         e_code
-            = (*p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue,
-                                                    *pp_req);
+            = (p_handle->p_pending_queue->pf_free)(p_handle->p_pending_queue,
+                                                   *pp_req);
     }
 
     return (e_code);
 }
+#endif
 
 
 
@@ -285,67 +286,135 @@ static
 e_error_code_t
 set_errstring_eigw_handle (pst_eigw_handle_t   p_handle,
                            pst_eigw_request_t  p_req,
+                           pst_eigw_response_t p_rsp,
                            e_error_code_t      err_code)
 {
     st_eigw_client_id_t client_id;
 
+
+    p_handle->err_string[0] = 0x00;
     switch (err_code)
     {
+        case E_FILE_NOTFOUND :
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, [not found file:%s]\n", p_handle->cfname);
+            break;
+        case E_PROTOCOL_CONNECT_EIGW:
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, connect    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_CODE   (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_STRING (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_HEARTBEAT_REQ_EIGW:
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, send HB    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_CODE   (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_STRING (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_BIND_REQ_EIGW:
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, bind req   EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_CODE   (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_STRING (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_BIND_RSP_FAIL_EIGW:
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, bind rsp   EIGW  [result:%d, ip:%s, port:%s]",
+                      (int) p_rsp->header.sRet,
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_BIND_RSP_TIMEOUT_EIGW:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                      "fail, bind rsp   EIGW  [timeout(5), ip%s, port:%s]",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_RECV_EIGW:
+            snprintf (p_handle->err_string,
+                      sizeof (p_handle->err_string) - 1,
+                      "fail, recv req   EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_CODE   (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_STRING (p_handle->p_sock));
+            break;
+        case E_PROTOCOL_SEND_EIGW:
+            snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+                      "fail, send       EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
+                      SOCKET_HANDLE_REMOTE_IP    (p_handle->p_sock),
+                      SOCKET_HANDLE_REMOTE_PORT  (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_CODE   (p_handle->p_sock),
+                      SOCKET_HANDLE_ERROR_STRING (p_handle->p_sock));
+            break;
         case E_PROTOCOL_INVALID_BODY_URI:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message URI      (URI:NULL)");
+                      "fail, invalid message URI      (URI:NULL)");
             break;
         case E_PROTOCOL_INVALID_BODY_PROTOCOL:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message PROTOCOL (URI:%s)",
-                        p_req->body.data + p_req->body.ind2);
+                      "fail, invalid message PROTOCOL (URI:%s)",
+                      p_req->body.data + p_req->body.ind2);
             break;
         case E_PROTOCOL_INVALID_BODY_METHOD:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message METHOD   (METHOD:%s)",
-                        p_req->body.method[0] == 0x00
-                         ? "NULL" : p_req->body.method);
+                      "fail, invalid message METHOD   (METHOD:%s)",
+                      p_req->body.method[0] == 0x00
+                      ? "NULL" : p_req->body.method);
             break;
         case E_PROTOCOL_INVALID_HEADER_FRAME:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message frame     (frame:0x%02X%02X)",
-                        p_req->header.cFrame[0],
-                        p_req->header.cFrame[1]);
+                      "fail, invalid message frame     (frame:0x%02X%02X)",
+                      p_req->header.cFrame[0],
+                      p_req->header.cFrame[1]);
             break;
         case E_PROTOCOL_INVALID_HEADER_LENGTH:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message length    (len:%d)",
-                        ntohs (p_req->header.usLength));
+                      "fail, invalid message length    (len:%d)",
+                      ntohs (p_req->header.usLength));
             break;
         case E_PROTOCOL_INVALID_HEADER_CLIENTID:
             memcpy (&client_id,
                     &p_req->header.unGwRteVal, sizeof (client_id));
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message client id (id:%02X%02X%02X%02X)",
-                        client_id.system_id,
-                        client_id.node_type,
-                        client_id.node_id,
-                        client_id.module_id);
+                      "fail, invalid message client id (id:%02X%02X%02X%02X)",
+                      client_id.system_id,
+                      client_id.node_type,
+                      client_id.node_id,
+                      client_id.module_id);
             break;
         case E_PROTOCOL_INVALID_HEADER_NAME:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message name      (name:%d)",
-                        p_req->header.unMsgName);
+                      "fail, invalid message name      (name:%d)",
+                      p_req->header.unMsgName);
             break;
         case E_PROTOCOL_INVALID_HEADER_TYPE:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, invalid message type      (name:%d, type:%d)",
-                        p_req->header.unMsgName,
-                        GET_MSGN_TYPE(p_req->header.unMsgName));
+                      "fail, invalid message type      (name:%d, type:%d)",
+                      p_req->header.unMsgName,
+                      GET_MSGN_TYPE(p_req->header.unMsgName));
             break;
         default:
             snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
-                        "fail, undefined  body error    (%d:%ld)",
-                        p_req->header.unGwRteVal,
-                        p_req->header.ulSeq);
+                      "fail, undefined  body error    (%d:%ld)",
+                      p_req->header.unGwRteVal,
+                      p_req->header.ulSeq);
 
             break;
     }
+
+    p_handle->err_code = (int) err_code;
 
     return (E_SUCCESS);
 }
@@ -392,40 +461,22 @@ validate_body_eigw_handle (pst_eigw_handle_t    p_handle,
     try_exception (p_req->body.method[0] == 0x00,
                     exception_invalid_message_body);
 
-    /* ----------------------------------------------------------------
-     * Logging low-level applicatioin request
-     * ---------------------------------------------------------------- */
-    Log (DEBUG_INFO, "info, req SRC[%ld:%d] [HEAD %s %s %s (H:%s)]\n",
-                    p_req->header.unGwRteVal,
-                    p_req->header.ulSeq,
-                    p_req->body.method,
-                    p_req->body.data + p_req->body.ind2,
-                    p_req->body.data + p_req->body.ind3,
-                    p_req->body.data [p_req->body.ind5] == 0x00
-                    ? "NONE" : p_req->body.data + p_req->body.ind5);
-
-    Log (DEBUG_INFO, "info, req SRC[%ld:%d] [BODY %s]\n",
-                    p_req->header.unGwRteVal,
-                    p_req->header.ulSeq,
-                    p_req->body.data [p_req->body.ind6] == 0x00
-                    ? "NULL" : p_req->body.data + p_req->body.ind6);
-
     e_code = E_SUCCESS;
 
 
     try_catch (exception_invalid_message_body)
     {
         st_eigw_response_t  rsp;
-        (void) set_errstring_eigw_handle (p_handle, p_req, e_code);
-        (void) (*p_handle->pf_encode)(p_req,
-                                      &rsp,
-                                      e_code,
-                                      (char *) "text/plain",
-                                      strlen (p_handle->err_string),
-                                      NULL,
-                                      NULL,
-                                      p_handle->err_string);
-        (*p_handle->pf_send) (p_handle, NULL, &rsp);
+        (void) set_errstring_eigw_handle (p_handle, p_req, NULL, e_code);
+        (void) (p_handle->pf_encode)(p_req,
+                                     &rsp,
+                                     e_code,
+                                     (char *) "text/plain",
+                                     strlen (p_handle->err_string),
+                                     NULL,
+                                     NULL,
+                                     p_handle->err_string);
+        (p_handle->pf_send) (p_handle, NULL, &rsp);
     }
     try_finally;
 
@@ -503,7 +554,7 @@ validate_header_eigw_handle (pst_eigw_handle_t   p_handle,
     {
         st_eigw_response_t  rsp;
 
-        (void) set_errstring_eigw_handle (p_handle, p_req, e_code);
+        (void) set_errstring_eigw_handle (p_handle, p_req, NULL, e_code);
         (void) (*p_handle->pf_encode)(p_req,
                                       &rsp,
                                       e_code,
@@ -540,6 +591,7 @@ is_already_received_message  (char      *p_buf,
 {
     e_error_code_t      e_code = E_FAILURE;
     pst_eigw_request_t  p_now  = (pst_eigw_request_t)p_buf;
+
 
     if (ntohs (p_now->header.usLength) <= received_bytes)
     {
@@ -583,22 +635,11 @@ static
 e_error_code_t
 recv_eigw_handle (pst_eigw_handle_t p_handle)
 {
-    e_error_code_t          e_code      = E_SUCCESS;
-    pst_stream_handle_t     p_rbuf    = p_handle->p_rbuf;
-    pst_eigw_request_t      p_req       = NULL;
-    int                     rbytes      = 0;
+    e_error_code_t          e_code  = E_SUCCESS;
+    pst_stream_handle_t     p_rbuf  = p_handle->p_rbuf;
+    pst_eigw_request_t      p_msg   = NULL;
+    int                     rbytes  = 0;
 
-
-    UNUSED (p_req);
-    /* ------------------------------------------------------------
-     * pre-checking socket state && initialize stream buffer
-     * ------------------------------------------------------------ */
-    if (p_handle->p_sock->sfd == -1)
-    {
-        try_exception ((e_code = (*p_handle->pf_connect)(p_handle))
-                       != E_SUCCESS,
-                       exception_connect_eigw);
-    }
 
     e_code = (p_rbuf->pf_read)(p_rbuf,
                                sizeof (st_eigw_request_header_t),
@@ -606,71 +647,49 @@ recv_eigw_handle (pst_eigw_handle_t p_handle)
                                recv_eigw_socket_handle,
                                p_handle->p_sock,
                                &rbytes,
-                      (char **)&p_req);
-    try_exception (e_code != E_SUCCESS, exception_recv_from_eigw);
-
-    try_exception ((e_code = (p_handle->pf_validate_header)(p_handle, p_req))
-                   != E_SUCCESS,
-                   exception_invalid_header_eigw);
-
-    if ((p_handle->p_req == NULL)
-        && (GET_MSGN_TYPE(p_req->header.unMsgName) == MSG_TYPE_REQ)
-        && (GET_MSGN_NAME(p_req->header.unMsgName) == EIGW_MSG_NAME_REST_REQ))
-    {
-        try_exception ((e_code = alloc_pending_queue_eigw_handle (p_handle,
-                                                         &p_handle->p_req))
-                       != E_SUCCESS,
-                       exception_alloc_pending_queue);
-
-        try_exception ((e_code = (p_handle->pf_validate_body)(p_handle, p_req))
-                       != E_SUCCESS,
-                       exception_invalid_body_eigw);
-    }
-    p_handle->p_req =  p_req;
-
-    Log (DEBUG_LOW,
-            "succ, recv message from eigw [SRC:%x SEQ:%lu len:%hd name:%x]\n",
-            p_handle->p_req->header.unGwRteVal,
-            p_handle->p_req->header.ulSeq,
-            p_handle->p_req->header.usLength,
-            p_handle->p_req->header.unMsgName);
-
-
-    try_catch (exception_connect_eigw)
-    {
-        e_code = E_SOCK_DISCONNECT;
-    }
-    try_catch (exception_alloc_pending_queue)
-    {
-        e_code = E_BUSY;
-    }
-    try_catch (exception_invalid_header_eigw)
-    {
-        (*p_handle->pf_disconnect)(p_handle);
-        e_code = E_SOCK_DISCONNECT;
-    }
-    try_catch (exception_invalid_body_eigw)
-    {
-        e_code = E_PROTOCOL_INVALID_BODY;
-    }
-    try_catch (exception_recv_from_eigw)
+                      (char **)&p_msg);
+    if (e_code != E_SUCCESS)
     {
         if (e_code != E_TIMEOUT)
         {
-            Log (DEBUG_ERROR,
-                    "fail, recv message from eigw [%d,%s]\n",
-                    p_handle->p_sock->err_no,
-                    p_handle->p_sock->err_string);
-
+            (void) set_errstring_eigw_handle (p_handle,
+                                              NULL,
+                                              NULL, E_PROTOCOL_RECV_EIGW);
             if (e_code == E_SOCK_DISCONNECT)
             {
-                /* reset stream buffer */
+                e_code = E_PROTOCOL_DISCONNECT_EIGW;
                 (*p_handle->pf_disconnect)(p_handle);
             }
         }
+        return (e_code);
     }
-    try_finally;
 
+
+    if ((e_code = (p_handle->pf_validate_header)(p_handle, p_msg)) != E_SUCCESS)
+    {
+        e_code = E_PROTOCOL_INVALID_HEADER;
+        (*p_handle->pf_disconnect)(p_handle);
+        return (e_code);
+    }
+
+
+    if ((e_code = (p_handle->pf_validate_body)(p_handle, p_msg)) != E_SUCCESS)
+    {
+        e_code = E_PROTOCOL_INVALID_BODY;
+        return (e_code);
+    }
+    p_handle->p_req =  p_msg;
+
+
+    snprintf (p_handle->err_string, sizeof (p_handle->err_string) - 1,
+          "succ, recv message from EIGW   [%02x%02x %d 0x%08x %lu 0x%08x %d]\n",
+          (unsigned char)(p_msg->header.cFrame[0]),
+          (unsigned char)(p_msg->header.cFrame[1]),
+          (int)ntohs(p_msg->header.usLength),
+          p_msg->header.unMsgName,
+          p_msg->header.ulSeq,
+          p_msg->header.unGwRteVal,
+          (int) p_msg->header.sRet);
 
     return (e_code);
 }
@@ -694,64 +713,34 @@ send_eigw_handle (pst_eigw_handle_t     p_handle,
                   pst_eigw_request_t    p_req,
                   pst_eigw_response_t   p_rsp)
 {
-    e_error_code_t      e_code     = E_SUCCESS;
-    pst_eigw_request_t  p_tmp      = p_req;
-    int                 send_bytes = p_rsp->header.usLength;
+    e_error_code_t  e_code     = E_SUCCESS;
+    int             send_bytes = p_rsp->header.usLength;
 
 
-    if (p_handle->p_sock->sfd == -1)
+    UNUSED (p_req);
+    p_rsp->header.usLength = htons (p_rsp->header.usLength);
+    p_handle->p_sock->p_sndbuf = (char *)p_rsp;
+    if ((e_code = (p_handle->p_sock->pf_send)(p_handle->p_sock,
+                                              send_bytes)) != E_SUCCESS)
     {
-        if (p_req != NULL)
-        {
-            Log (DEBUG_ERROR,
-                    "fail, discard http response(not connect app) [%s:%s]\n",
-                    p_rsp->body.status_code,
-                    p_req->body.data + p_req->body.ind2);
-        }
+        e_code = E_PROTOCOL_SEND_EIGW;
+        set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
 
+        return (e_code);
     }
-    else
-    {
-        p_rsp->header.usLength = htons (p_rsp->header.usLength);
-        p_handle->p_sock->p_sndbuf = (char *)p_rsp;
-        e_code = (*p_handle->p_sock->pf_send)(p_handle->p_sock,
-                                              send_bytes);
-        try_exception (e_code != E_SUCCESS, exception_send_response);
-
-        p_handle->last_tick = time (NULL);
-        Log (DEBUG_LOW,
-                "succ, send message to   eigw [SRC:%x SEQ:%d len:%d name:%x]\n",
-                p_rsp->header.unGwRteVal,
-                p_rsp->header.ulSeq,
-                ntohs (p_rsp->header.usLength),
-                p_rsp->header.unMsgName);
-    }
+    p_handle->last_tick = time (NULL);
 
 
-    try_catch (exception_send_response)
-    {
-        Log (DEBUG_ERROR,
-                "fail, send    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
-                p_handle->p_sock->remote_ip,
-                p_handle->p_sock->remote_port,
-                p_handle->p_sock->err_no,
-                p_handle->p_sock->err_string);
-
-        if (p_req != NULL)
-        {
-            Log (DEBUG_ERROR,
-                    "fail, discard http response(not connect app) [%s:%s]\n",
-                    p_rsp->body.status_code,
-                    p_req->body.data + p_req->body.ind2);
-        }
-    }
-    try_finally;
-
-
-    if (p_req != NULL)
-    {
-        e_code = free_pending_queue_eigw_handle (p_handle, &p_tmp);
-    }
+    snprintf (p_handle->err_string,
+          sizeof (p_handle->err_string) - 1,
+          "succ, send message to   EIGW   [%02x%02x %d 0x%08x %lu 0x%08x %d]\n",
+          (unsigned char)(p_rsp->header.cFrame[0]),
+          (unsigned char)(p_rsp->header.cFrame[1]),
+          (int)ntohs(p_rsp->header.usLength),
+          p_rsp->header.unMsgName,
+          p_rsp->header.ulSeq,
+          p_rsp->header.unGwRteVal,
+          (int) p_rsp->header.sRet);
 
     return (e_code);
 }
@@ -776,8 +765,10 @@ heartbeat_eigw_handle (pst_eigw_handle_t p_handle)
     e_error_code_t              e_code  = E_SUCCESS;
     st_eigw_request_hb_t        req;
 
-    try_exception (time (NULL) - p_handle->last_tick < p_handle->hb_interval,
-                   exception_heartbeat_bypass);
+    if (time (NULL) - p_handle->last_tick < p_handle->hb_interval)
+    {
+        return (E_SUCCESS);
+    }
 
     /* ------------------------------------------------------------------
      * HEART REQ/RESP
@@ -790,22 +781,12 @@ heartbeat_eigw_handle (pst_eigw_handle_t p_handle)
     GET_EIGW_SEND_SEQ(p_handle, req.header.ulSeq);
 
     p_handle->p_sock->p_sndbuf = (char *)&req;
-    e_code = (*p_handle->p_sock->pf_send)(p_handle->p_sock,
-                                          sizeof (req));
-    try_exception (e_code != E_SUCCESS, exception_send_heartbeat_request);
-
-
-    try_catch (exception_send_heartbeat_request)
+    if ((e_code = (*p_handle->p_sock->pf_send)(p_handle->p_sock,
+                                               sizeof (req))) != E_SUCCESS)
     {
-        Log (DEBUG_ERROR,
-                "fail, send heartbeat request  to   eigw \n");
-        e_code = E_FAILURE;
+        e_code = E_PROTOCOL_HEARTBEAT_REQ_EIGW;
+        set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
     }
-    try_catch (exception_heartbeat_bypass)
-    {
-        ;
-    }
-    try_finally;
 
     return (e_code);
 }
@@ -850,10 +831,10 @@ bind_eigw_handle (pst_eigw_handle_t p_handle)
 
 
     total_length = 0;
-    now_length   = 0;
     tick         = time (NULL);
     do
     {
+        now_length = 0;
         p_handle->p_sock->p_rcvbuf = (char *)(&rsp) + total_length;
         e_code = (*p_handle->p_sock->pf_recv)(p_handle->p_sock,
                                               sizeof (rsp) - total_length,
@@ -866,34 +847,31 @@ bind_eigw_handle (pst_eigw_handle_t p_handle)
     } while (total_length < (int)sizeof (req.header));
     try_exception (rsp.header.sRet != SUCC, exception_recv_bind_response);
 
-    Log (DEBUG_NORMAL,
-            "succ, bind       EIGW  [result:%d]\n",
-            (int) rsp.header.sRet);
+
+    p_handle->err_code = E_SUCCESS;
+    snprintf (p_handle->err_string,
+              sizeof (p_handle->err_string) - 1,
+              "succ, bind       EIGW  [result:%d]\n",
+              (int) rsp.header.sRet);
+
 
     try_catch (exception_recv_bind_socket);
     try_catch_through (exception_send_bind_request)
     {
-        snprintf (p_handle->err_string,
-                  sizeof (p_handle->err_string) - 1,
-                  "fail, bind       EIGW  [errno:%d, err_string:%s]",
-                  p_handle->p_sock->err_no,
-                  p_handle->p_sock->err_string);
-        e_code = E_FAILURE;
+        e_code = E_PROTOCOL_BIND_REQ_EIGW;
+        (void) set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
     }
     try_catch (exception_recv_bind_response)
     {
-        snprintf (p_handle->err_string,
-                  sizeof (p_handle->err_string) - 1,
-                  "fail, bind       EIGW  [result:%d]",
-                  (int) rsp.header.sRet);
-        e_code = E_FAILURE;
+        e_code = E_PROTOCOL_BIND_RSP_FAIL_EIGW;
+        (void) set_errstring_eigw_handle (p_handle,
+                                          NULL,
+                                          (pst_eigw_response_t)&rsp, e_code);
     }
     try_catch (exception_recv_bind_timeout)
     {
-        snprintf (p_handle->err_string,
-                  sizeof (p_handle->err_string) - 1,
-                  "fail, bind       EIGW  [timeout(5)]");
-        e_code = E_FAILURE;
+        e_code = E_PROTOCOL_BIND_RSP_TIMEOUT_EIGW;
+        (void) set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
     }
     try_finally;
 
@@ -919,6 +897,11 @@ connect_eigw_handle (pst_eigw_handle_t p_handle)
     e_error_code_t              e_code  = E_SUCCESS;
 
 
+    if (p_handle->p_sock && (SOCKET_HANDLE_SOCKET_FD(p_handle->p_sock) > -1))
+    {
+        return (E_SUCCESS);
+    }
+
     if (p_handle->p_sock == NULL)
     {
         try_exception ((e_code = init_socket_handle (&(p_handle->p_sock),
@@ -935,40 +918,17 @@ connect_eigw_handle (pst_eigw_handle_t p_handle)
     try_exception ((e_code = bind_eigw_handle (p_handle)) != E_SUCCESS,
                    exception_bind_eigw_handle);
 
-    Log (DEBUG_CRITICAL,
-            "succ, connect    EIGW  [ip:%s, port:%s]\n",
-            p_handle->p_sock->remote_ip,
-            p_handle->p_sock->remote_port);
-
     try_catch (exception_init_socket)
     {
         (*p_handle->p_sock->pf_close)(p_handle->p_sock);
     }
     try_catch (exception_connect_eigw_handle)
     {
-        static int i = 0;
-
-        if (i%100 == 0)
-        {
-            Log (DEBUG_LOW,
-                    "fail, connect    EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
-                    p_handle->p_sock->remote_ip,
-                    p_handle->p_sock->remote_port,
-                    p_handle->p_sock->err_no,
-                    p_handle->p_sock->err_string);
-        }
-        i++;
+        e_code = E_PROTOCOL_CONNECT_EIGW;
+        set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
     }
     try_catch (exception_bind_eigw_handle)
     {
-        Log (DEBUG_ERROR,
-                "%s\n", p_handle->err_string);
-        Log (DEBUG_ERROR,
-                "fail, bind       EIGW  [ip:%s, port:%s, errno:%d, str:%s]\n",
-                p_handle->p_sock->remote_ip,
-                p_handle->p_sock->remote_port,
-                p_handle->p_sock->err_no,
-                p_handle->p_sock->err_string);
         (*p_handle->pf_disconnect)(p_handle);
     }
     try_finally;
@@ -996,11 +956,6 @@ disconnect_eigw_handle (pst_eigw_handle_t p_handle)
 
     e_code = (*p_handle->p_sock->pf_close)(p_handle->p_sock);
     (*p_handle->p_rbuf->pf_reset)(p_handle->p_rbuf);
-
-    Log (DEBUG_CRITICAL,
-            "succ, disconnect EIGW  [ip:%s, port:%s]\n",
-            p_handle->p_sock->remote_ip,
-            p_handle->p_sock->remote_port);
 
     return (e_code);
 }
@@ -1056,8 +1011,7 @@ set_eigw_handle (pst_eigw_handle_t p_handle)
     try_catch (exception_not_found_file)
     {
         e_code = E_FILE_NOTFOUND;
-        Log (DEBUG_CRITICAL,
-                "fail, [not found file:%s]\n", p_handle->cfname);
+        set_errstring_eigw_handle (p_handle, NULL, NULL, e_code);
     }
     try_finally;
 
@@ -1122,7 +1076,8 @@ init_eigw_handle (pst_eigw_handle_t *pp_handle,
 
     if (p_fname != NULL)
     {
-        set_eigw_handle (p_handle);
+        try_exception (set_eigw_handle (p_handle) != E_SUCCESS,
+                       exception_set_handle);
     }
 
 
@@ -1170,6 +1125,11 @@ init_eigw_handle (pst_eigw_handle_t *pp_handle,
         Log (DEBUG_CRITICAL,
                 "fail, alloc EIGW handle\n");
         e_code = E_ALLOC_HANDLE;
+    }
+    try_catch (exception_set_handle)
+    {
+        Log (DEBUG_CRITICAL,"%s", EIGW_HANDLE_ERROR_STRING (p_handle));
+        e_code = (e_error_code_t) EIGW_HANDLE_ERROR_CODE (p_handle);
     }
     try_catch (exception_init_pthread_mutex)
     {
