@@ -5,8 +5,8 @@
 [TEST_CASE_INPUT]
 NF             = UDR
 METHOD         = PATCH
-URI            = http://192.168.0.208:8080/users?ID=z00001&CTI_ID=1220000001&GRADE=0&DEPARTMENT_ID=0&NAME=z00001&PASSWD=12345&USED_F=1
-CONTENT_TYPE   =
+URI            = http://192.168.0.208:8080/users
+CONTENT_TYPE   = application/json
 CONTENT_LENGTH = 0
 ADD_HEADER     =
-BODY           = 
+BODY           = {"ctiId": "1160099999", "departmentId": "1065101", "grade": "22",  "id": "t99999",  "passwd": "114",  "usedF": "Y",  "name": "테스트9" } 

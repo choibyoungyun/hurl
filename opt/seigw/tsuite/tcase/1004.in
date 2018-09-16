@@ -5,8 +5,8 @@
 [TEST_CASE_INPUT]
 NF             = UDR
 METHOD         = DELETE
-URI            = http://192.168.0.208:8080/users?ID=z00001
-CONTENT_TYPE   =
+URI            = http://192.168.0.208:8080/users
+CONTENT_TYPE   = application/json
 CONTENT_LENGTH = 0
 ADD_HEADER     =
-BODY           = 
+BODY           = t99999
