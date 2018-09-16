@@ -119,7 +119,6 @@ main (int argc, char *argv[])
     if (init_http_handle (&p_handle,
                           NULL,
                           NULL,
-                          HTTP_SIMPLE_MODE,
                           NULL) != E_SUCCESS)
     {
         return (-1);
@@ -141,7 +140,7 @@ main (int argc, char *argv[])
         {
             if (e_code == E_BUSY)
             {
-                (void) perform_http_handle (p_handle, p_request);
+                (void) (p_handle->pf_perform)(p_handle, p_request);
                 i--;
                 continue;
             }
@@ -153,12 +152,12 @@ main (int argc, char *argv[])
         }
 
         setopt_http_request (p_request);
-        (void) perform_http_handle (p_handle, p_request);
+        (void) (p_handle->pf_perform)(p_handle, p_request);
     }
 
     while (p_handle->still_running)
     {
-        (void) perform_http_handle (p_handle, NULL);
+        (void) (p_handle->pf_perform)(p_handle, p_request);
     }
 
     (void) destory_http_handle (p_handle);

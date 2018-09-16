@@ -34,7 +34,18 @@ INC_DIR =  -I../include	\
 LIB_DIR = -L../lib \
 		  -L$(HOME)/lib \
 		  -L$(WORKHOME)/lib
-LIBS    = -lhgw -ljson -ljlog -lcfg -lfile -lsignal -lshm -lbase -lcurl -lpthread
+LIBS    = -lhgw -ljson  \
+		  -ljlog -lcfg \
+		  -lfile -lsignal -lshm -lbase \
+		  -lcurl -lpthread
+
+#LIBS    = -lhgw -ljson  \
+		  -lhaf -loam_cpm -lcpoam \
+		  -linet_ipv6 -lipc_cmn_util \
+		  -lunix_udp \
+		  -ljlog -lcfg -ljson \
+		  -lfile -lsignal -lshm -lbase \
+		  -lcurl -lpthread
 
 all: program1  program2
 program1 : $(OBJS1)

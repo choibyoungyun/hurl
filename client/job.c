@@ -39,7 +39,7 @@ send_response_to_app_server (pst_http_request_t p_http)
     /* -------------------------------------------------------------------
      * set  content length
      * ------------------------------------------------------------------- */
-    p_http->rsp.content_length = p_http->rsp.p_body->now_size;
+    p_http->rsp.content_length = MCHUNK_NOW_SIZE(p_http->rsp.p_body);
 
     /* -------------------------------------------------------------------
      *  ISSUE. TOO BIG SIZE BODY (32K)
@@ -79,56 +79,62 @@ send_response_to_app_server (pst_http_request_t p_http)
             /* -----------------------------------------------------------
              * copy header to body for sending to EIGW
              * ----------------------------------------------------------- */
-            if (p_http->rsp.p_body->max_size < p_http->rsp.p_header->now_size)
-            {
-                char *p_tmp = NULL;
-                p_tmp = (char *)malloc (p_http->rsp.p_header->now_size + 1);
-
-                if (p_http->rsp.p_body->p_mem != NULL)
-                {
-                    free (p_http->rsp.p_body->p_mem);
-                }
-                p_http->rsp.p_body->p_mem = p_tmp;
-                p_http->rsp.p_body->max_size = p_http->rsp.p_header->now_size + 1;
-                p_http->rsp.p_body->now_size = 0;
-            }
-
-            memcpy (p_http->rsp.p_body->p_mem,
-                    p_http->rsp.p_header->p_mem,
-                    p_http->rsp.p_header->now_size);
-            p_http->rsp.p_body->now_size = p_http->rsp.p_header->now_size;
+            (p_http->rsp.p_body->pf_reset) (p_http->rsp.p_body);
+            (p_http->rsp.p_body->pf_add)   (p_http->rsp.p_body,
+                                        MCHUNK_MEM (p_http->rsp.p_header),
+                                        MCHUNK_NOW_SIZE (p_http->rsp.p_header));
         }
-
-        Log (DEBUG_INFO,"info, rsp SRC[%x:%ld] [%04d %s %s clength(%d:%d)]\n",
-                        p_req->header.unGwRteVal,
-                        p_req->header.ulSeq,
-                        p_http->rsp.status_code,
-                        p_req->body.method,
-                        p_req->body.data + p_req->body.ind2,
-                        (int)p_http->rsp.content_length,
-                        p_http->rsp.p_body->now_size);
-
-        Log (DEBUG_INFO,"info, rsp SRC[%x:%ld] [header:%s]\n",
-                        p_req->header.unGwRteVal,
-                        p_req->header.ulSeq,
-                        p_http->rsp.p_header->p_mem);
-
-        Log (DEBUG_LOW, "info, rsp SRC[%x:%ld] [body  :%s]\n",
-                        p_req->header.unGwRteVal,
-                        p_req->header.ulSeq,
-                        p_http->rsp.p_body->p_mem);
     }
 
-    e_code = (*p_handle->pf_encode)(p_req,
-                                    &rsp,
-                                    p_http->rsp.status_code,
-                                    p_http->rsp.p_content_type,
-                                    p_http->rsp.content_length,
-                                    p_http->rsp.p_header,
-                                    p_http->rsp.p_body,
-                                    p_http->err_string);
+    e_code = (p_handle->pf_encode)(p_req,
+                                   &rsp,
+                                   p_http->rsp.status_code,
+                                   p_http->rsp.p_content_type,
+                                   p_http->rsp.content_length,
+                                   p_http->rsp.p_header,
+                                   p_http->rsp.p_body,
+                                   p_http->err_string);
 
-    e_code = (*p_handle->pf_send)(p_handle, p_req, &rsp);
+    e_code = (p_handle->pf_send)(p_handle, p_req, &rsp);
+    if (e_code != E_SUCCESS)
+    {
+        Log (DEBUG_ERROR, "%s", EIGW_HANDLE_ERROR_STRING (p_handle));
+        if (p_req)
+        {
+            Log (DEBUG_ERROR,
+                    "fail, discard rsp SRC[%08x:%ld] [HEAD %s %s %s length(%s)]\n",
+                    rsp.header.unGwRteVal,
+                    rsp.header.ulSeq,
+                    rsp.body.method,
+                    rsp.body.status_code,
+                    IS_AVAILABLE_EIGW_RSP_BODY_DATA (&rsp, rsp.body.ind2)
+                    ? rsp.body.data + rsp.body.ind2 : "NULL",
+                    IS_AVAILABLE_EIGW_RSP_BODY_DATA (&rsp, rsp.body.ind3)
+                    ? rsp.body.data + rsp.body.ind3 : "NULL");
+
+        }
+    }
+    else
+    {
+        Log (DEBUG_LOW, "%s", EIGW_HANDLE_ERROR_STRING (p_handle));
+        Log (DEBUG_INFO,
+                "succ, send rsp SRC[%08x:%ld] [HEAD %s %s %s length(%s)]\n",
+                rsp.header.unGwRteVal,
+                rsp.header.ulSeq,
+                rsp.body.method,
+                rsp.body.status_code,
+                IS_AVAILABLE_EIGW_RSP_BODY_DATA (&rsp, rsp.body.ind2)
+                ? rsp.body.data + rsp.body.ind2 : "NULL",
+                IS_AVAILABLE_EIGW_RSP_BODY_DATA (&rsp, rsp.body.ind3)
+                ? rsp.body.data + rsp.body.ind3 : "NULL");
+
+        Log (DEBUG_LOW,
+                "succ, send rsp SRC[%08x:%ld] [BODY %s]\n",
+                p_req->header.unGwRteVal,
+                p_req->header.ulSeq,
+                IS_AVAILABLE_EIGW_RSP_BODY_DATA (&rsp, rsp.body.ind4)
+                ? rsp.body.data + rsp.body.ind4 : "NULL");
+    }
 
 
     if (p_http->rsp.status_code == 401)
@@ -139,6 +145,9 @@ send_response_to_app_server (pst_http_request_t p_http)
                  (HTTP_HANDLE_FROM_REQUEST(p_http)->p_auth);
         (void) (p_auth->pf_clean)(p_auth);
     }
+
+
+    if (p_req) FREE (p_req);
 
     return (e_code);
 }
@@ -163,22 +172,25 @@ setopt_http_header (pst_eigw_request_t     p_app_req,
 {
     e_error_code_t      e_code    = E_SUCCESS;
     CURL                *p_handle = p_http_req->p_context;
-    char                tmp [128] = {0,};
+    char                tmp [HTTP_MAX_HEADER_LEN] = {0,};
 
 
     /* --------------------------------------------------------------------
      * REQUEST APPLICATION HEADER (CONTENT-TYPE)
      * -------------------------------------------------------------------- */
-    snprintf (tmp, sizeof (tmp) - 1, "%s:%s",
-             "Content-Type",
-              p_app_req->body.data + p_app_req->body.ind3);
-    p_http_req->p_header = curl_slist_append (p_http_req->p_header,
-                                             (const char *)tmp);
+    if (IS_AVAILABLE_EIGW_REQ_BODY_DATA(p_app_req, p_app_req->body.ind6))
+    {
+        snprintf (tmp, sizeof (tmp) - 1, "%s:%s",
+                 "Content-Type",
+                  p_app_req->body.data + p_app_req->body.ind3);
+        p_http_req->p_header = curl_slist_append (p_http_req->p_header,
+                                                 (const char *)tmp);
+    }
 
     /* --------------------------------------------------------------------
      * REQUEST APPLICATION HEADER (USER-DEFINED HEADER)
      * -------------------------------------------------------------------- */
-    if (p_app_req->body.ind5 > 0)
+    if (IS_AVAILABLE_EIGW_REQ_BODY_DATA(p_app_req, p_app_req->body.ind5))
     {
         p_http_req->p_header = curl_slist_append (p_http_req->p_header,
                   p_app_req->body.data + p_app_req->body.ind5);
@@ -186,8 +198,10 @@ setopt_http_header (pst_eigw_request_t     p_app_req,
 
     /* --------------------------------------------------------------------
      * REQUEST APPLICATION HEADER (OAUTH HEADER)
+     * - COMPARE NF NAME
      * -------------------------------------------------------------------- */
-    if (p_auth && ((p_auth->pf_verify)(p_auth) == E_SUCCESS))
+    if (p_auth && ((p_auth->pf_verify)(p_auth,
+                    p_app_req->body.data + p_app_req->body.ind1) == E_SUCCESS))
     {
         p_http_req->p_header = curl_slist_append (p_http_req->p_header,
                                                   p_auth->auth_header);
@@ -293,7 +307,7 @@ setopt_http_request (pst_eigw_request_t     p_app_req,
     /* --------------------------------------------------------------------
      *  REQUEST BODY
      * -------------------------------------------------------------------- */
-    if (p_app_req->body.ind6 > 0)
+    if (IS_AVAILABLE_EIGW_REQ_BODY_DATA(p_app_req, p_app_req->body.ind6))
     {
         p_http_req->err_code = curl_easy_setopt (p_handle,
                                                  CURLOPT_POSTFIELDS,
@@ -339,43 +353,52 @@ send_request_to_http_server (pst_eigw_handle_t  p_eigw,
 {
     e_error_code_t      e_code = E_SUCCESS;
     pst_http_request_t  p_uri  = NULL;
-    int                 alloc_size = 0;
 
 
-    UNUSED (alloc_size);
-    try_exception (p_eigw == NULL, exception_null_eigw_request);
+    try_assert (p_eigw == NULL);
 
-    /*  all http request handle         */
-    e_code = init_http_request (p_http,
-                                &p_uri,
-                                NULL,
-                                send_response_to_app_server);
-    try_exception (e_code == E_BUSY, exception_busy_http_handle);
+    /*  init http request handle         */
+    do
+    {
 
+        e_code = init_http_request (p_http,
+                                    &p_uri,
+                                    NULL,
+                                    send_response_to_app_server);
+        if (e_code == E_BUSY)
+        {
+            Log (DEBUG_LOW,
+                    "info, busy http memory pool [%p: total(%d)]\n",
+                   p_http->p_pending_queue,
+                   p_http->p_pending_queue->num_of_block);
+
+            (void) (p_http->pf_perform) (p_http, NULL);
+            usleep(5);
+            continue;
+        }
+    } while (e_code != E_SUCCESS);
 
     /*  add pending information         */
     p_uri->p_user1 = (void *)p_eigw;
-    alloc_size     = offsetof(st_eigw_response_t, body.data)
-                            + p_eigw->p_req->body.ind3;
-    memcpy (p_uri->p_user2, p_eigw->p_req, alloc_size);
+    p_uri->p_user2 = (void *)p_eigw->p_req;
 
-
-    /*  validate application request    */
-    strcpy (p_uri->uri, p_eigw->p_req->body.data + p_eigw->p_req->body.ind2);
-    strcpy (p_uri->method, p_eigw->p_req->body.method);
 
     /* set http option                  */
-    try_exception ((e_code = setopt_http_request (p_eigw->p_req,
-                                                  p_uri,
-                                                  p_auth))
-                   != E_SUCCESS,
-                   exception_setopt_http_request);
+    strcpy (p_uri->uri, p_eigw->p_req->body.data + p_eigw->p_req->body.ind2);
+    strcpy (p_uri->method, p_eigw->p_req->body.method);
+    if ((e_code = setopt_http_request (p_eigw->p_req,
+                                       p_uri,
+                                       p_auth)) != E_SUCCESS)
+    {
+        (void) send_response_to_app_server (p_uri);
+        (p_http->p_pending_queue->pf_free)(p_http->p_pending_queue, p_uri);
+        p_eigw->p_req = NULL;
 
-    p_eigw->p_req = NULL;
-
+        return (E_SUCCESS);
+    }
 
     /*  send http request               */
-    e_code = perform_http_handle (p_http, p_uri);
+    e_code = (p_http->pf_perform)(p_http, p_uri);
     if (e_code != E_SUCCESS)
     {
         Log (DEBUG_ERROR,
@@ -387,31 +410,7 @@ send_request_to_http_server (pst_eigw_handle_t  p_eigw,
         try_assert (1);
     }
 
-
-    try_catch (exception_null_eigw_request)
-    {
-    }
-    try_catch (exception_setopt_http_request)
-    {
-        (void) send_response_to_app_server (p_uri);
-        (*p_http->p_pending_queue->pf_free)(p_http->p_pending_queue, p_uri);
-        p_eigw->p_req = NULL;
-
-        e_code = E_SUCCESS;
-    }
-    try_catch (exception_busy_http_handle)
-    {
-        Log (DEBUG_INFO,
-                "info, busy http handle [pending req: %d] \n",
-                p_http->still_running);
-        e_code = E_BUSY;
-    }
-    try_finally;
-
-    if (p_http->still_running != 0)
-    {
-        (void) (*p_http->pf_perform)(p_http, NULL);
-    }
+    p_eigw->p_req = NULL;
 
     return (e_code);
 }
@@ -433,7 +432,47 @@ static
 e_error_code_t
 recv_request_from_app_server (pst_eigw_handle_t    p_handle)
 {
-    return ((*p_handle->pf_recv)(p_handle));
+    e_error_code_t      e_code = E_SUCCESS;
+    pst_eigw_request_t  p_msg  = NULL;
+    int                 length = 0;
+
+
+    if ((e_code = (p_handle->pf_recv)(p_handle)) != E_SUCCESS)
+    {
+        return (e_code);
+    }
+
+    length = (int) ntohs(p_handle->p_req->header.usLength);
+    p_msg = (pst_eigw_request_t) MALLOC (length);
+    if (p_msg == NULL)
+    {
+        p_handle->p_req = NULL;
+        return (E_ALLOC_HANDLE);
+    }
+    memcpy (p_msg, p_handle->p_req, length);
+    p_handle->p_req = (pst_eigw_request_t)p_msg;
+
+    /* ----------------------------------------------------------------
+     * Logging low-level applicatioin request
+     * ---------------------------------------------------------------- */
+    Log (DEBUG_LOW, "%s", EIGW_HANDLE_ERROR_STRING(p_handle));
+
+    Log (DEBUG_INFO, "succ, recv req SRC[%08x:%d] [HEAD %s %s %s (H:%s)]\n",
+                    p_msg->header.unGwRteVal,
+                    p_msg->header.ulSeq,
+                    p_msg->body.method,
+                    p_msg->body.data + p_msg->body.ind2,
+                    p_msg->body.data + p_msg->body.ind3,
+                    IS_AVAILABLE_EIGW_REQ_BODY_DATA(p_msg, p_msg->body.ind5)
+                    ? p_msg->body.data + p_msg->body.ind5 : "NULL");
+
+    Log (DEBUG_LOW,  "succ, recv req SRC[%08x:%d] [BODY %s]\n",
+                    p_msg->header.unGwRteVal,
+                    p_msg->header.ulSeq,
+                    IS_AVAILABLE_EIGW_REQ_BODY_DATA(p_msg, p_msg->body.ind6)
+                    ? p_msg->body.data + p_msg->body.ind6 : "NULL");
+
+    return (e_code);
 }
 
 
@@ -454,18 +493,57 @@ e_error_code_t
 preprocess_job (pst_process_handle_t    p_handle)
 {
     e_error_code_t  e_code = E_SUCCESS;
+    static int      i      = 0;
 
 
-    if ((p_handle->p_auth->pf_verify)(p_handle->p_auth) != E_SUCCESS)
+    /*  1. GET ACCESS-TOKEN (OAUTH2)    */
+    if ((p_handle->p_auth->pf_verify)(p_handle->p_auth, NULL) != E_SUCCESS)
     {
         (p_handle->p_auth->pf_send)(p_handle->p_auth, p_handle->p_http);
     }
 
+    if ((p_handle->p_auth->pf_verify)(p_handle->p_auth, NULL) != E_SUCCESS)
+    {
+        return (E_FAILURE);
+    }
 
+
+    /*  2. CONNECT TO EIGW              */
+    if (EIGW_HANDLE_SOCKET_FD (p_handle->p_eigw) < 0)
+    {
+        if ((p_handle->p_eigw->pf_connect)(p_handle->p_eigw) != E_SUCCESS)
+        {
+            if ((i++%100) == 0)
+            {
+                Log (DEBUG_ERROR,
+                        "%s", EIGW_HANDLE_ERROR_STRING(p_handle->p_eigw));
+            }
+            return (E_FAILURE);
+        }
+
+        Log (DEBUG_CRITICAL,
+                "succ, connect    EIGW  [ip:%s, port:%s, sockfd:%d]\n",
+                EIGW_HANDLE_REMOTE_IP   (p_handle->p_eigw),
+                EIGW_HANDLE_REMOTE_PORT (p_handle->p_eigw),
+                EIGW_HANDLE_SOCKET_FD   (p_handle->p_eigw));
+    }
+
+
+    /*  3. heartbeat  with EIGW                 */
     if ((time (NULL) - p_handle->p_eigw->last_tick)
             > p_handle->p_eigw->hb_interval)
     {
-        (void) (*p_handle->p_eigw->pf_heartbeat)(p_handle->p_eigw);
+        if ((p_handle->p_eigw->pf_heartbeat)(p_handle->p_eigw) != E_SUCCESS)
+        {
+            Log (DEBUG_ERROR,
+                    "%s", EIGW_HANDLE_ERROR_STRING (p_handle->p_eigw));
+        }
+    }
+
+
+    if (p_handle->p_http->still_running != 0)
+    {
+        (void) (p_handle->p_http->pf_perform) (p_handle->p_http, NULL);
     }
 
     return (e_code);
@@ -475,7 +553,7 @@ preprocess_job (pst_process_handle_t    p_handle)
 
 
 /* *************************************************************************
- *  @brief          MIGRATE IPCC.TCD to BILL.TBL_HIST_TCALL
+ *  @brief          DO JOB
  *  @version
  *  @ingroup
  *  @date
@@ -497,62 +575,30 @@ do_job   (pst_process_handle_t   p_handle)
         return (E_DELAY_JOB);
     }
 
-    if ((p_handle->p_auth->pf_verify)(p_handle->p_auth) != E_SUCCESS)
-    {
-        return (E_DELAY_JOB);
-    }
-
-
     /*  recv request from EIGW          */
-    if (p_handle->p_eigw->p_req == NULL)
-    {
-        e_code = recv_request_from_app_server (p_handle->p_eigw);
-        try_exception (e_code != E_SUCCESS, exception_busy_eigw_handle);
-
-        try_exception (GET_MSGN_NAME(p_handle->p_eigw->p_req->header.unMsgName)
-                       == EIGW_MSG_NAME_HEARTBEAT,
-                       exception_heartbeat_eigw_handle);
-    }
-
-    /*  send request to HTTP          */
-    do
-    {
-        e_code = send_request_to_http_server (p_handle->p_eigw,
-                                              p_handle->p_http,
-                                              p_handle->p_auth);
-        if (e_code == E_SUCCESS) e_code = E_IMMEDIATE_JOB;
-    } while (e_code == E_BUSY);
-
-
-
-    try_catch (exception_busy_eigw_handle)
+    e_code = recv_request_from_app_server (p_handle->p_eigw);
+    if (e_code != E_SUCCESS)
     {
         if ((e_code == E_TIMEOUT)
                 || (e_code == E_PROTOCOL_INVALID_BODY)
                 || (e_code == E_BUSY))
             e_code = E_IMMEDIATE_JOB;
         else
+        {
+            Log (DEBUG_INFO, "%s", EIGW_HANDLE_ERROR_STRING(p_handle->p_eigw));
             e_code = E_DELAY_JOB;
+        }
+
+        return (e_code);
     }
-    try_catch (exception_heartbeat_eigw_handle)
-    {
-        p_handle->p_eigw->p_req = NULL;
-        p_handle->p_eigw->last_tick = time (NULL);
-        Log (DEBUG_NORMAL,
-                "succ, recv heartbeat response from eigw [result:%d]\n",
-                (int) p_handle->p_eigw->p_req->header.sRet);
-        e_code = E_IMMEDIATE_JOB;
-    }
-    try_finally;
 
 
-    if (p_handle->p_http->still_running != 0)
-    {
-        (void) send_request_to_http_server (NULL,
-                                            p_handle->p_http,
-                                            p_handle->p_auth);
-        e_code = E_IMMEDIATE_JOB;
-    }
+    /*  send request to HTTP          */
+    e_code = send_request_to_http_server (p_handle->p_eigw,
+                                          p_handle->p_http,
+                                          p_handle->p_auth);
+    if (e_code == E_SUCCESS) e_code = E_IMMEDIATE_JOB;
+
 
     return (e_code);
 }

@@ -60,8 +60,8 @@ static
 e_error_code_t
 reload_process (pst_process_handle_t    p_handle)
 {
-    (*p_handle->p_trace->pf_config)(p_handle->p_trace);
-    (*p_handle->p_worker->pf_config)(p_handle->p_worker);
+    (p_handle->p_trace->pf_config)(p_handle->p_trace);
+    (p_handle->p_worker->pf_config)(p_handle->p_worker);
 
     return (E_SUCCESS);
 }
@@ -203,10 +203,10 @@ init_process (pst_process_handle_t p_handle)
                     != E_SUCCESS,
                    exception_init_process);
 
+
     /* --------------------------------------------------------------------
      * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
-     *             exception_init_process);
-     *
+     *            exception_init_process);
      * initialize   OAM interface
      * try_exception ((e_code = init_oam (p_handle, mod_name)) != E_SUCCESS,
      *             exception_init_process);
@@ -238,7 +238,6 @@ init_process (pst_process_handle_t p_handle)
     try_exception ((e_code = init_http_handle (&p_handle->p_http,
                                                p_handle->cfname,
                                         (char *) HTTP_CONFIG_SECTION_NAME,
-                                               HTTP_SIMPLE_MODE,
                                                NULL))
                    != E_SUCCESS,
                    exception_init_process);
@@ -259,15 +258,6 @@ init_process (pst_process_handle_t p_handle)
         (void)(p_handle->p_auth->pf_show)(p_handle->p_auth, NULL);
     }
     p_handle->p_http->p_auth = (void *) p_handle->p_auth;
-
-    /* --------------------------------------------------------------------
-     * try_exception ((e_code = init_haf (p_handle)) != E_SUCCESS,
-     *             exception_init_process);
-     *
-     * initialize   OAM interface
-     * try_exception ((e_code = init_oam (p_handle, mod_name)) != E_SUCCESS,
-     *             exception_init_process);
-     * -------------------------------------------------------------------- */
 
 
     /* -------------------------------------------------------------------
