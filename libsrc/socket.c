@@ -811,10 +811,10 @@ accept_socket_handle (pst_socket_handle_t    p_local,
 {
     e_error_code_t      e_code   = E_SUCCESS;
     pst_socket_handle_t p_remote = NULL;
-    fd_set          active_fd_set, read_fd_set;
-    struct  timeval timeout;
-    int             ret;
-    int             sfd = -1;
+    fd_set              active_fd_set, read_fd_set;
+    struct  timeval     timeout;
+    int                 ret;
+    int                 sfd = -1;
 
 
     if (p_local->sfd < 0)
