@@ -97,6 +97,7 @@
  * DEFINE OAUTH AUTHORIXATION CONFIG FILE FIELD
  * ----------------------------------------------------------------------- */
 #define OAUTH_CONFIG_USED_FIELD                 "AUTH_USED"
+#define OAUTH_CONFIG_POST_FIELD                 "AUTH_POST_TYPE"
 #define OAUTH_CONFIG_TOKEN_FNAME_FIELD          "AUTH_TOKEN_FNAME"
 #define OAUTH_CONFIG_VERIFY_TICK_FIELD          "AUTH_VERIFY_TICK"
 #define OAUTH_CONFIG_DOMAIN_FIELD               "AUTH_DOMAIN"
@@ -123,6 +124,13 @@
 #define OAUTH_CONFIG_PROTOCOL_VERSION_DEFAULT   "2"
 
 /* -----------------------------------------------------------------------
+ * DEFINE OAUTH POST
+ *  1: HEADER
+ *  2: BODY
+ * ----------------------------------------------------------------------- */
+#define OAUTH_CONFIG_POST_DEFAULT               "2"
+
+/* -----------------------------------------------------------------------
  * DEFINE OAUTH AUTHORIXATION GRANT TYPE
  * 1  : E_AUTH_GRANT_CREDENTIALS
  * 2  : E_AUTH_GRANT_PASSWD
@@ -141,7 +149,6 @@
  * DEFINE OAUTH TOKEN REPOSITORY FILENAME
  * ----------------------------------------------------------------------- */
 #define OAUTH_CONFIG_TOKEN_FNAME_DEFAULT        "key/auth_token.dat"
-
 
 /* -----------------------------------------------------------------------
  * DEFINE OAUTH TOKEN VERIFICATION TICK
@@ -197,6 +204,11 @@
 #define OAUTH_JSON_TOKEN_SCOPE                  "scope"
 #define OAUTH_JSON_TOKEN_EXPIRES_IN             "expires_in"
 
+typedef enum _e_http_auth_post_t
+{
+    ENUM_OAUTH_POST_HEADER = 1,
+    ENUM_OAUTH_POST_BODY,
+} e_http_auth_post_t;
 
 typedef enum _e_http_auth_grant_t
 {
@@ -205,6 +217,20 @@ typedef enum _e_http_auth_grant_t
     ENUM_OAUTH_GRANT_REFRESH
 } e_http_auth_grant_t;
 
+
+typedef struct _st_http_auth_parameter *pst_http_auth_parameter_t;
+typedef struct _st_http_auth_parameter_t
+{
+    e_http_auth_post_t          post_type;
+    char                        post_field    [OAUTH_MAX_HEADER_LEN];
+    char                        content_type  [OAUTH_MAX_HEADER_LEN];
+
+    e_http_auth_grant_t         grant_type;
+    char                        client_id     [OAUTH_MAX_CLIENT_SECRET_LEN];
+    char                        client_secret [OAUTH_MAX_CLIENT_SECRET_LEN];
+    char                        username      [OAUTH_MAX_USERNAME_LEN];
+    char                        passwd        [OAUTH_MAX_PASSWD_LEN];
+} st_http_auth_parameter_t;
 
 typedef struct _st_http_auth_token_t *pst_http_auth_token_t;
 typedef struct _st_http_auth_token_t
@@ -238,15 +264,9 @@ typedef struct _st_auth_handle_t
 
     int                         hversion;
     char                        uri           [OAUTH_MAX_URI_LEN];
-    char                        content_type  [OAUTH_MAX_HEADER_LEN];
     char                        accept_type   [OAUTH_MAX_HEADER_LEN];
 
-    e_http_auth_grant_t         grant_type;
-    char                        client_id     [OAUTH_MAX_CLIENT_SECRET_LEN];
-    char                        client_secret [OAUTH_MAX_CLIENT_SECRET_LEN];
-    char                        username      [OAUTH_MAX_USERNAME_LEN];
-    char                        passwd        [OAUTH_MAX_PASSWD_LEN];
-
+    st_http_auth_parameter_t    parameter;
 
     e_error_code_t              (*pf_set)    (pst_auth_handle_t);
     e_error_code_t              (*pf_load)   (pst_auth_handle_t);
@@ -254,7 +274,7 @@ typedef struct _st_auth_handle_t
     e_error_code_t              (*pf_send)   (pst_auth_handle_t,
                                               pst_http_handle_t);
     e_error_code_t              (*pf_recv)   (pst_http_request_t);
-    e_error_code_t              (*pf_verify) (pst_auth_handle_t);
+    e_error_code_t              (*pf_verify) (pst_auth_handle_t, char *);
     e_error_code_t              (*pf_clean)  (pst_auth_handle_t);
     void                        (*pf_show)   (pst_auth_handle_t, char *);
 } st_auth_handle_t;

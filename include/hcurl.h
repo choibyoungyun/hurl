@@ -28,10 +28,6 @@
 /* curl stuff */
 #include <curl/curl.h>
 
-#ifdef _UV_LIB_SUPPORT
- #include <uv.h>
-#endif
-
 #ifndef CURLPIPE_MULTIPLEX
 /* This little trick will just make sure that we don't enable pipelining for
    libcurls old enough to not have this symbol. It is _not_ defined to zero in
@@ -92,24 +88,23 @@
 #define HTTP_REQUEST_INTERNAL_ERROR(x) { \
     (x)->err_string [sizeof((x)->err_string) - 1] = 0x00; \
     strncpy ((x)->err_string,\
-             curl_easy_strerror((x)->err_code), \
+             curl_easy_strerror((CURLcode)((x)->err_code)), \
              sizeof ((x)->err_string) - 1); \
 }
 #define HTTP_REQUEST_ERROR_CODE(x)      ((x)->err_code)
 #define HTTP_REQUEST_ERROR_STRING(x)    ((x)->err_string)
 
+
+#define HTTP_HANDLE_INTERNAL_ERROR(x,y) { \
+    (x)->err_code = (int)(y); \
+    (x)->err_string [sizeof((x)->err_string) - 1] = 0x00; \
+    strncpy ((x)->err_string,\
+             curl_multi_strerror((y)), \
+             sizeof ((x)->err_string) - 1); \
+}
+
 #define HTTP_HANDLE_ERROR_CODE(x)       ((x)->err_code)
 #define HTTP_HANDLE_ERROR_STRING(x)     ((x)->err_string)
-
-
-/* **************************************************************************
- * HTTP HANDLE MODE
- * **************************************************************************/
-typedef enum _e_http_handle_mode_t
-{
-    HTTP_SIMPLE_MODE  = 0,
-    HTTP_SOCKET_MODE
-} e_http_handle_mode_t;
 
 
 /* ------------------------------------------------------------------------
@@ -155,7 +150,8 @@ typedef struct _st_http_request_t
 
     /*  member function             */
     e_http_error_code_t     (*pf_resp)    (pst_http_request_t);
-    e_http_error_code_t     (*pf_set    ) (pst_http_request_t);
+    e_http_error_code_t     (*pf_set  )   (pst_http_request_t);
+    e_http_error_code_t     (*pf_reset  ) (pst_http_request_t);
 } st_http_request_t;
 
 
@@ -277,17 +273,8 @@ typedef struct _st_http_ssl_t
 typedef struct _st_http_handle_t   *pst_http_handle_t;
 typedef struct _st_http_handle_t
 {
-    char                    cfname   [256];
-    char                    csection [128];
-
-    e_http_handle_mode_t    mode;
-
-#ifdef _UV_LIB_SUPPORT
-    /* UV  loop handle                          */
-    uv_loop_t               *p_loop;
-    uv_timer_t              timer;
-    curl_socket_t           sockfd;
-#endif
+    char                    cfname   [FNAME_STRING_BUF_LEN];
+    char                    csection [FNAME_STRING_BUF_LEN];
 
     /* CURL multi handle                        */
     CURLM                   *p_context;
@@ -296,8 +283,8 @@ typedef struct _st_http_handle_t
     void                    *p_auth;
 
     /* last result code. (include/curl/multi.h) */
-    CURLMcode               err_code;
-    char                    err_string [256];
+    int                     err_code;
+    char                    err_string [ERROR_STRING_BUF_LEN];
 
     /* last perform tick                        */
     int                     last_tick;
@@ -333,18 +320,6 @@ typedef struct _st_http_handle_t
 } st_http_handle_t;
 
 
-#ifdef _UV_LIB_SUPPORT
-typedef struct _st_http_context_t    *pst_http_context_t;
-typedef struct _st_http_context_t
-{
-    uv_poll_t           poll_handle;
-
-    pst_http_handle_t   p_handle;
-    curl_socket_t       sockfd;
-}st_http_context_t;
-#endif
-
-
 /* ---------------------------------------------------------------------
  * HTTP HANDLE CONTEXT API
  * --------------------------------------------------------------------- */
@@ -352,14 +327,14 @@ e_http_error_code_t
 init_http_handle        (pst_http_handle_t      *pp_handle,
                          char                   *p_fname,
                          char                   *p_section,
-                         e_http_handle_mode_t   mode,
                          e_http_error_code_t (*pf_set ) (pst_http_handle_t));
 e_http_error_code_t
 destory_http_handle     (pst_http_handle_t  p_handle);
+
+/*
 e_http_error_code_t
 perform_http_handle     (pst_http_handle_t  p_handle,
                          pst_http_request_t p_req);
-/*
 e_http_error_code_t
 setopt_http_handle      (pst_http_handle_t  p_handle);
 */

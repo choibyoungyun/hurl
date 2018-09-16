@@ -24,6 +24,12 @@
      ((offset) + (((align) - ((offset) % (align))) % (align)))
 #endif
 
+/*  ----------------------------------------------------------------------
+ *  MACRO: MCHUNK ATTRIBUTE
+ *  ----------------------------------------------------------------------*/
+#define MCHUNK_MEM(x)       ((x)->p_mem)
+#define MCHUNK_NOW_SIZE(x)  ((x)->now_size)
+#define MCHUNK_MAX_SIZE(x)  ((x)->max_size)
 
 /* ------------------------------------------------------------------------
  *  expandable memory chunk
@@ -36,7 +42,8 @@ typedef struct _st_mchunk_handle_t
     int                 now_size;       /*  size currently used */
     char                *p_mem;
 
-    e_error_code_t      (*pf_add)(pst_mchunk_handle_t, char *, int);
+    e_error_code_t      (*pf_add)  (pst_mchunk_handle_t, char *, int);
+    e_error_code_t      (*pf_reset)(pst_mchunk_handle_t);
 } st_mchunk_handle_t;
 
 e_error_code_t

@@ -84,12 +84,27 @@ typedef enum _e_socket_mode_t
 #define SOCKET_CONFIG_STIMEOUT_DEFAULT      "1000"
 #define SOCKET_CONFIG_RESET_TIMEOUT_DEFAULT "0"  /* ulimtied */
 
-
-
-
 #define SOCKET_CONFIG_LOCAL_IP_DEFAULT      "0.0.0.0"
 #define SOCKET_CONFIG_BACKLOG_DEFAULT       "5"
 
+
+/*  ----------------------------------------------------------------------
+ *  MACRO: SET SOCKET ERROR CODE & STRING
+ *  ----------------------------------------------------------------------*/
+#define SOCKET_HANDLE_INTERNAL_ERROR(handle,code,str) { \
+    (handle)->err_code = (code); \
+    (handle)->err_string [sizeof((handle)->err_string) - 1] = 0x00; \
+    strncpy ((handle)->err_string,\
+             (str), \
+             sizeof ((handle)->err_string) - 1); \
+}
+#define SOCKET_HANDLE_ERROR_CODE(x)     ((x)->err_code)
+#define SOCKET_HANDLE_ERROR_STRING(x)   ((x)->err_string)
+
+#define SOCKET_HANDLE_REMOTE_IP(x)      ((x)->remote_ip)
+#define SOCKET_HANDLE_REMOTE_PORT(x)    ((x)->remote_port)
+
+#define SOCKET_HANDLE_SOCKET_FD(x)      ((x)->sfd)
 
 typedef struct _st_socket_addr_t    *pst_socket_addr_t;
 typedef struct _st_socket_addr_t
@@ -107,8 +122,8 @@ typedef struct _st_socket_addr_t
 typedef struct _st_socket_handle_t  *pst_socket_handle_t;
 typedef struct _st_socket_handle_t
 {
-    char                cfname   [128];
-    char                csection [128];
+    char                cfname   [FNAME_STRING_BUF_LEN];
+    char                csection [FNAME_STRING_BUF_LEN];
 
     /* ----------------------------------------------
      *  ROLE (SERVER | CLIENT)
@@ -128,8 +143,8 @@ typedef struct _st_socket_handle_t
     e_bool_t            linger;
 
     int                 sfd;
-    int                 err_no;
-    char                err_string   [256];
+    int                 err_code;
+    char                err_string   [ERROR_STRING_BUF_LEN];
 
     /*  local  server information   */
     st_socket_addr_t    local;

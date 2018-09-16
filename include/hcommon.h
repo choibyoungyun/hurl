@@ -37,15 +37,19 @@
 
 
 #ifndef PKG_BASE_VARIABLE
- #define PKG_BASE_VARIABLE           "PKG_ROOT"
+ #define PKG_BASE_VARIABLE          "PKG_ROOT"
 #endif
 
 #ifndef DEFAULT_STRING_BUF_LEN
- #define DEFAULT_STRING_BUF_LEN      256
+ #define DEFAULT_STRING_BUF_LEN     256
 #endif
 
 #ifndef FNAME_STRING_BUF_LEN
- #define FNAME_STRING_BUF_LEN        DEFAULT_STRING_BUF_LEN
+ #define FNAME_STRING_BUF_LEN       DEFAULT_STRING_BUF_LEN
+#endif
+
+#ifndef ERROR_STRING_BUF_LEN
+ #define ERROR_STRING_BUF_LEN       1024
 #endif
 
 
@@ -86,16 +90,22 @@
 /* ------------------------------------------------------------------------
  * user defined memory
  * ------------------------------------------------------------------------ */
+#ifndef MEMORY_ALIGNED
+ #define MEMORY_ALIGNED(offset,align) \
+     ((offset) + (((align) - ((offset) % (align))) % (align)))
+#endif
+
+
 #ifdef _USER_MALLOC
  #define MALLOC(x)
  #define CALLOC(x,y)
  #define REALLOC(x,y)
  #define FREE(x)
 #else
- #define MALLOC(x)    malloc((size_t)(x))
+ #define MALLOC(x)    malloc((size_t)MEMORY_ALIGNED((x), sizeof(void *)))
  #define CALLOC(x,y)  calloc((x),(y))
  #define REALLOC(x,y) realloc((x),(y))
- #define FREE(x)      {if (x) {free((void *)(x)); x=NULL;}}
+ #define FREE(x)      {if (x) {free((void *)(x));}}
 #endif
 
 
@@ -153,8 +163,17 @@ typedef enum _e_error_code_t
 
     /* APPLICATION(CURL or EIGW) PROTOCOAL    */
     E_PROTOCOL_HTTP_INTERNAL = 900,
+    E_PROTOCOL_HTTP_CRITICAL,
     E_PROTOCOL_HTTP_SETOPT,
     E_PROTOCOL_SPEC,
+    E_PROTOCOL_DISCONNECT_EIGW,
+    E_PROTOCOL_CONNECT_EIGW,
+    E_PROTOCOL_HEARTBEAT_REQ_EIGW,
+    E_PROTOCOL_BIND_REQ_EIGW,
+    E_PROTOCOL_BIND_RSP_FAIL_EIGW,
+    E_PROTOCOL_BIND_RSP_TIMEOUT_EIGW,
+    E_PROTOCOL_RECV_EIGW,
+    E_PROTOCOL_SEND_EIGW,
     E_PROTOCOL_INVALID_HEADER,
     E_PROTOCOL_INVALID_HEADER_FRAME,
     E_PROTOCOL_INVALID_HEADER_LENGTH,

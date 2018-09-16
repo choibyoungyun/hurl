@@ -25,13 +25,11 @@
 /* ---------------------------------------------------------------------
  * EIGW I/F Message Name
  * --------------------------------------------------------------------- */
-
 #define EIGW_MSG_NAME_BIND                      0xff00
 #define EIGW_MSG_NAME_HEARTBEAT                 0x0000
 #define EIGW_MSG_NAME_REST_REQ                  0x0001
 #define EIGW_MSG_NAME_REST_RSP
 #define EIGW_MSG_NAME_REST_NOTIFY               0x0002
-
 
 /* ---------------------------------------------------------------------
  * eigw pending buffer (NOT USED)
@@ -51,6 +49,53 @@
 #define EIGW_CONFIG_HB_INTERVAL_DEFAULT         "3"
 #define EIGW_CONFIG_STREAM_BUF_SIZE_DEFAULT     "65536"
 #define EIGW_CONFIG_PENDING_BUF_COUNT_DEFAULT   "64"
+
+
+/* -----------------------------------------------------------------------
+ * MACDRO DEFINE
+ * ----------------------------------------------------------------------- */
+#define EIGW_MAX_MSG_REQUEST_LENGTH             0x7FFF
+#define EIGW_MAX_MSG_HEADER_LENGHT      (sizeof(st_eigw_request_header_t))
+#define EIGW_MAX_MSG_BODY_DATA_LENGTH(x) \
+    ((unsigned short)(0xFFFF) - (unsigned short)offsetof(x, body.data) - 1024)
+
+
+/*  ----------------------------------------------------------------------
+ *  MACRO: GET EIGW SEND SEQUENCE
+ *  x: stream buffer,  y: available buffer size
+ *  ----------------------------------------------------------------------*/
+#define GET_EIGW_SEND_SEQ(handle, value) { \
+    pthread_mutex_lock (&handle->send_lock); \
+    value = handle->send_seq++; \
+    pthread_mutex_unlock (&handle->send_lock);\
+}
+/*  ----------------------------------------------------------------------
+ *  MACRO: IS AVAIABLE REQUEST DATA
+ *  req: request message,  ind: request body indicator
+ *  ----------------------------------------------------------------------*/
+#define IS_AVAILABLE_EIGW_REQ_BODY_DATA(req, ind) \
+    (((ind) >= 0) && ((req)->body.data[(ind)] != 0x00))
+
+#define IS_AVAILABLE_EIGW_RSP_BODY_DATA(rsp, ind) \
+    (((ind) >= 0) && ((rsp)->body.data[(ind)] != 0x00))
+
+
+/*  ----------------------------------------------------------------------
+ *  MACRO: SET EIGW ERROR CODE & STRING
+ *  ----------------------------------------------------------------------*/
+#define EIGW_HANDLE_INTERNAL_ERROR(handle,no,str) { \
+    (handle)->err_no = (no); \
+    (handle)->err_string [sizeof((handle)->err_string) - 1] = 0x00; \
+    strncpy ((handle)->err_string,\
+             (str), \
+             sizeof ((handle)->err_string) - 1); \
+}
+#define EIGW_HANDLE_ERROR_CODE(x)     ((x)->err_code)
+#define EIGW_HANDLE_ERROR_STRING(x)   ((x)->err_string)
+
+#define EIGW_HANDLE_REMOTE_IP(x)      (SOCKET_HANDLE_REMOTE_IP((x)->p_sock))
+#define EIGW_HANDLE_REMOTE_PORT(x)    (SOCKET_HANDLE_REMOTE_PORT((x)->p_sock))
+#define EIGW_HANDLE_SOCKET_FD(x)      (SOCKET_HANDLE_SOCKET_FD((x)->p_sock))
 
 
 /*  ----------------------------------------------------------------------
@@ -135,11 +180,6 @@ typedef struct _st_eigw_response_t
 } st_eigw_response_t;
 
 
-#define EIGW_MAX_MSG_REQUEST_LENGTH     0xEF
-#define EIGW_MAX_MSG_BODY_DATA_LENGTH(x) \
-    ((unsigned short)(0xFFFF) - (unsigned short)offsetof(x,  body.data) - 1024)
-
-
 /* -----------------------------------------------------------------------
  *  EIGW BIND I/F MESSAGE
  * ---------------------------------------------------------------------- */
@@ -182,18 +222,6 @@ typedef struct _st_eigw_response_hb_t
 } st_eigw_response_hb_t;
 
 
-/*  ----------------------------------------------------------------------
- *  EIGW SEND SEQUENCE
- *  x: stream buffer,  y: available buffer size
- *  ----------------------------------------------------------------------*/
-
-#define GET_EIGW_SEND_SEQ(handle, value) { \
-    pthread_mutex_lock (&handle->send_lock); \
-    value = handle->send_seq++; \
-    pthread_mutex_unlock (&handle->send_lock);\
-}
-
-
 /* -----------------------------------------------------------------------
  *  EIGW HANDLE
  * ---------------------------------------------------------------------- */
@@ -214,8 +242,8 @@ typedef struct _st_eigw_handle_t
     unsigned int                last_tick;
 
     /*  EIGW socket handle              */
-    int                         err_no;
-    char                        err_string   [256];
+    int                         err_code;
+    char                        err_string [ERROR_STRING_BUF_LEN];
 
     /*  EIGW socket handle              */
     pst_stream_handle_t         p_rbuf;
