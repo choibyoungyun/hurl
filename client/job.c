@@ -585,7 +585,8 @@ do_job   (pst_process_handle_t   p_handle)
             e_code = E_IMMEDIATE_JOB;
         else
         {
-            Log (DEBUG_INFO, "%s", EIGW_HANDLE_ERROR_STRING(p_handle->p_eigw));
+            Log (DEBUG_CRITICAL,
+                    "%s", EIGW_HANDLE_ERROR_STRING(p_handle->p_eigw));
             e_code = E_DELAY_JOB;
         }
 
