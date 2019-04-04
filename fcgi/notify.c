@@ -185,7 +185,7 @@ process_put_method (pst_fcgi_handle_t    p_handle,
                     "fail, internal error (connect to notification gateway [%s:%s] [%d,%s])\n",
                     p_handle->p_sock->remote_ip,
                     p_handle->p_sock->remote_port,
-                    p_handle->p_sock->err_no,
+                    p_handle->p_sock->err_code,
                     p_handle->p_sock->err_string);
             return (e_code);
         }
@@ -201,7 +201,7 @@ process_put_method (pst_fcgi_handle_t    p_handle,
                 "fail, internal error (sending message to notification gateway [%s:%s] [%d,%s])\n",
                   p_handle->p_sock->remote_ip,
                   p_handle->p_sock->remote_port,
-                  p_handle->p_sock->err_no,
+                  p_handle->p_sock->err_code,
                   p_handle->p_sock->err_string);
         return (e_code);
     }
